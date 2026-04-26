@@ -1,6 +1,6 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { NavLink } from "@/components/NavLink";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Bell,
   ChevronDown,
@@ -16,8 +16,8 @@ import {
   ClipboardList,
   Activity,
   LogOut,
-  Sparkles,
 } from "lucide-react";
+import logo from "@/assests/Experience_my_India.webp";
 import { ThemeToggle } from "./theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +31,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { currentAdmin, currentEmployee } from "@/lib/mock-data";
+import { auth } from "@/lib/api";
 
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };
 
@@ -47,7 +47,6 @@ const adminNav: NavItem[] = [
   { to: "/admin/users", label: "All Users", icon: Users },
   { to: "/admin/today", label: "Today's Logs", icon: CalendarClock },
   { to: "/admin/logs", label: "All Logs", icon: ClipboardList },
-  { to: "/admin/activity", label: "Activity Logs", icon: Activity },
   { to: "/admin/profile", label: "Profile", icon: UserIcon },
 ];
 
@@ -77,13 +76,7 @@ function SidebarNav({ items, onNavigate }: { items: NavItem[]; onNavigate?: () =
 function Brand() {
   return (
     <Link to="/" className="flex items-center gap-2 px-5 py-5">
-      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-primary to-primary-hover text-primary-foreground shadow-sm">
-        <Sparkles className="h-4 w-4" />
-      </div>
-      <div className="flex flex-col leading-none">
-        <span className="text-sm font-semibold tracking-tight">Tracely</span>
-        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Work Tracking</span>
-      </div>
+      <img src={logo} alt="Experience My India Logo" className="h-14 w-auto object-contain dark:bg-white/95 dark:px-3 dark:py-1.5 dark:rounded-xl dark:shadow-[0_0_15px_rgba(255,255,255,0.05)] transition-all" />
     </Link>
   );
 }
@@ -102,12 +95,38 @@ export function AppShell({
   actions?: ReactNode;
 }) {
   const items = role === "admin" ? adminNav : employeeNav;
-  const user = role === "admin" ? currentAdmin : currentEmployee;
+  const [user, setUser] = useState<any>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const res = await auth.getProfile();
+        if (res.success && res.data) {
+          setUser(res.data);
+        } else {
+          navigate("/");
+        }
+      } catch (err) {
+        console.error("Failed to fetch user profile", err);
+        navigate("/");
+      }
+    };
+    fetchUser();
+  }, [navigate]);
+
+  if (!user) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-surface text-foreground">
+    <div className="min-h-screen bg-transparent text-foreground">
       {/* Sidebar — desktop */}
       <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-sidebar-border bg-sidebar lg:flex">
         <Brand />
@@ -157,23 +176,8 @@ export function AppShell({
             <Menu className="h-5 w-5" />
           </Button>
 
-          <div className="relative hidden flex-1 max-w-md md:block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search logs, users, projects..."
-              className="h-9 border-border bg-secondary/60 pl-9 text-sm focus-visible:bg-background"
-            />
-            <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-border bg-background px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-              ⌘K
-            </kbd>
-          </div>
-
           <div className="ml-auto flex items-center gap-1">
             <ThemeToggle />
-            <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground" aria-label="Notifications">
-              <Bell className="h-4 w-4" />
-              <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-destructive" />
-            </Button>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -199,14 +203,15 @@ export function AppShell({
                     <UserIcon className="mr-2 h-4 w-4" /> Profile
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Settings className="mr-2 h-4 w-4" /> Settings
-                </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link to="/login" className="text-destructive focus:text-destructive">
-                    <LogOut className="mr-2 h-4 w-4" /> Sign out
-                  </Link>
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive cursor-pointer"
+                  onClick={() => {
+                    auth.logout();
+                    navigate("/");
+                  }}
+                >
+                  <LogOut className="mr-2 h-4 w-4" /> Sign out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
 import { LogsTable } from "@/components/LogsTable";
@@ -12,25 +12,71 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ChevronLeft, ChevronRight, FileText, Filter, PlusCircle, Search } from "lucide-react";
-import { myLogs, type LogStatus } from "@/lib/mock-data";
+import { ChevronLeft, ChevronRight, FileText, Filter, PlusCircle, Search, Loader2 } from "lucide-react";
+import { workLogs } from "@/lib/api";
+import { toast } from "sonner";
+
+interface WorkLog {
+  id: string;
+  title: string;
+  accomplishments: string;
+  meetingsAttended: number;
+  focusForTomorrow?: string;
+  status: "completed" | "in_progress" | "pending";
+  date: string;
+  user?: string;
+  userAvatar?: string;
+  meetingNotes?: string;
+  attachments?: any[];
+}
 
 export default function MyLogs() {
-  const [status, setStatus] = useState<"all" | LogStatus>("all");
+  const [status, setStatus] = useState<"all" | "completed" | "in_progress" | "pending">("all");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
+  const [logs, setLogs] = useState<WorkLog[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [totalLogs, setTotalLogs] = useState(0);
   const perPage = 8;
 
-  const filtered = useMemo(() => {
-    return myLogs.filter((l) => {
-      if (status !== "all" && l.status !== status) return false;
-      if (q && !l.title.toLowerCase().includes(q.toLowerCase())) return false;
-      return true;
-    });
-  }, [status, q]);
+  // Fetch logs from backend
+  useEffect(() => {
+    const fetchLogs = async () => {
+      try {
+        setIsLoading(true);
+        const skip = (page - 1) * perPage;
+        const response = await workLogs.getMyLogs(
+          perPage,
+          skip,
+          status === "all" ? undefined : status
+        );
 
-  const pages = Math.max(1, Math.ceil(filtered.length / perPage));
-  const pageLogs = filtered.slice((page - 1) * perPage, page * perPage);
+        if (response.success && response.data) {
+          // Transform backend data to match UI expectations
+          const transformedLogs = response.data.map((log: any) => ({
+            ...log,
+            user: log.user?.name || "Unknown",
+            userAvatar: log.user?.avatar,
+          }));
+          setLogs(transformedLogs);
+          if (response.pagination) {
+            setTotalLogs(response.pagination.total);
+          }
+        } else {
+          toast.error("Failed to fetch logs");
+        }
+      } catch (error: any) {
+        console.error("Error fetching logs:", error);
+        toast.error("Failed to load your logs");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchLogs();
+  }, [page, status]);
+
+  const pages = Math.max(1, Math.ceil(totalLogs / perPage));
 
   return (
     <AppShell
@@ -49,7 +95,10 @@ export default function MyLogs() {
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search logs..." className="h-10 pl-9" />
         </div>
         <div className="flex items-center gap-2">
-          <Select value={status} onValueChange={(v) => setStatus(v as never)}>
+          <Select value={status} onValueChange={(v) => {
+            setStatus(v as never);
+            setPage(1); // Reset to first page when filter changes
+          }}>
             <SelectTrigger className="h-10 w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
@@ -58,12 +107,16 @@ export default function MyLogs() {
               <SelectItem value="pending">Pending</SelectItem>
             </SelectContent>
           </Select>
-          <Input type="date" className="h-10 w-40" />
           <Button variant="outline" size="icon" className="h-10 w-10"><Filter className="h-4 w-4" /></Button>
         </div>
       </div>
 
-      {pageLogs.length === 0 ? (
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-sm text-muted-foreground">Loading your logs...</span>
+        </div>
+      ) : logs.length === 0 ? (
         <EmptyState
           icon={FileText}
           title="No logs found"
@@ -72,14 +125,24 @@ export default function MyLogs() {
         />
       ) : (
         <>
-          <LogsTable logs={pageLogs} basePath="/employee/logs" />
+          <LogsTable logs={logs} basePath="/employee/logs" />
           <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-            <span>Showing {(page - 1) * perPage + 1}–{Math.min(page * perPage, filtered.length)} of {filtered.length}</span>
+            <span>Showing {(page - 1) * perPage + 1}–{Math.min(page * perPage, totalLogs)} of {totalLogs}</span>
             <div className="flex items-center gap-1">
               <Button variant="outline" size="icon" className="h-8 w-8" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="px-2">Page {page} of {pages}</span>
+              {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
+                <Button
+                  key={p}
+                  variant={p === page ? "default" : "outline"}
+                  size="sm"
+                  className="h-8 w-8"
+                  onClick={() => setPage(p)}
+                >
+                  {p}
+                </Button>
+              ))}
               <Button variant="outline" size="icon" className="h-8 w-8" disabled={page === pages} onClick={() => setPage((p) => p + 1)}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
