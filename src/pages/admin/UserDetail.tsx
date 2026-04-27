@@ -189,6 +189,9 @@ export default function UserDetail() {
                 type="date" 
                 value={date}
                 onChange={(e) => { setDate(e.target.value); setPage(1); }}
+                onClick={(e) => {
+                  try { (e.target as HTMLInputElement).showPicker(); } catch (err) {}
+                }}
                 className="h-9 w-full border-none bg-transparent hover:bg-secondary/50 focus-visible:ring-0 px-3 cursor-pointer text-sm font-medium text-muted-foreground" 
               />
             </div>

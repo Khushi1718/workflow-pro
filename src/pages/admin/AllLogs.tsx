@@ -83,7 +83,7 @@ export default function AllLogs() {
           user === "all" ? undefined : user,
           status === "all" ? undefined : status,
           date ? date : undefined,
-          date ? date : undefined
+          date ? `${date}T23:59:59.999Z` : undefined
         );
 
         if (response.success && response.data) {
@@ -207,6 +207,9 @@ export default function AllLogs() {
             type="date" 
             value={date}
             onChange={(e) => { setDate(e.target.value); setPage(1); }}
+            onClick={(e) => {
+              try { (e.target as HTMLInputElement).showPicker(); } catch (err) {}
+            }}
             className="h-9 w-full border-none bg-transparent hover:bg-secondary/50 focus-visible:ring-0 px-3 cursor-pointer text-sm font-medium text-muted-foreground" 
           />
         </div>

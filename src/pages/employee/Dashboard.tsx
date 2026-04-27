@@ -140,9 +140,11 @@ export default function EmployeeDashboard() {
               {(() => {
                 const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
                 const today = new Date();
-                const weekDays = Array.from({ length: 5 }, (_, i) => {
+                const currentDay = today.getDay();
+                const diffToMonday = currentDay === 0 ? 6 : currentDay - 1;
+                const weekDays = Array.from({ length: 7 }, (_, i) => {
                   const d = new Date(today);
-                  d.setDate(today.getDate() - (4 - i));
+                  d.setDate(today.getDate() - diffToMonday + i);
                   const dateStr = d.toDateString();
                   const dayLabel = dayNames[d.getDay()].charAt(0);
                   const count = myLogs.filter((l: any) => new Date(l.date).toDateString() === dateStr).length;

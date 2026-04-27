@@ -81,7 +81,6 @@ export default function LogDetail() {
               </div>
               <div className="flex items-center gap-2.5">
                 <StatusBadge status={log.status} />
-                <Button variant="outline" size="sm" className="shadow-xs"><Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit</Button>
               </div>
             </div>
           </header>
