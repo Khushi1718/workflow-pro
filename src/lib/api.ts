@@ -1,7 +1,7 @@
-// API Client for WorkFlow Pro Backend
-const API_BASE_URL = "http://localhost:5123/api";
+// API Client for WorkFlow Pro Next backend
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "/api";
 
-interface ApiResponse<T> {
+interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
   message?: string;
@@ -30,20 +30,18 @@ export const removeAuthToken = () => {
 };
 
 // Make API request with auth token
-const apiRequest = async <T,>(
+const apiRequest = async <T = any,>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> => {
   const url = `${API_BASE_URL}${endpoint}`;
   const token = getAuthToken();
 
-  const headers: HeadersInit = {
-    "Content-Type": "application/json",
-    ...options.headers,
-  };
+  const headers = new Headers(options.headers);
+  headers.set("Content-Type", "application/json");
 
   if (token) {
-    headers.Authorization = `Bearer ${token}`;
+    headers.set("Authorization", `Bearer ${token}`);
   }
 
   const response = await fetch(url, {
@@ -118,25 +116,58 @@ export const workLogs = {
     });
   },
 
-  getMyLogs: async (limit = 10, skip = 0, status?: string, startDate?: string, endDate?: string) => {
+  getMyLogs: async (limit = 10, skip = 0, status?: string, startDate?: string, endDate?: string, submittedOnly = false) => {
     const params = new URLSearchParams();
     params.append("limit", limit.toString());
     params.append("skip", skip.toString());
     if (status && status !== "all") params.append("status", status);
     if (startDate) params.append("startDate", startDate);
     if (endDate) params.append("endDate", endDate);
+    if (submittedOnly) params.append("submittedOnly", "true");
 
     return apiRequest(`/work-logs/my-logs?${params.toString()}`);
   },
 
   getDetail: async (id: string) => {
-    return apiRequest(`/work-logs/${id}`);
+    const res = await apiRequest(`/work-logs/${id}`);
+    if (res.success && res.data) {
+      // Extract user name from userId object if it exists
+      const log = res.data;
+      if (log.userId && typeof log.userId === "object" && "name" in log.userId) {
+        log.user = log.userId.name;
+      }
+    }
+    return res;
   },
 
   update: async (id: string, logData: any) => {
     return apiRequest(`/work-logs/${id}`, {
       method: "PUT",
       body: JSON.stringify(logData),
+    });
+  },
+
+  getTodayLog: async () => {
+    return apiRequest("/work-logs/today");
+  },
+
+  updateTaskStatus: async (logId: string, taskId: string, status: string) => {
+    return apiRequest(`/work-logs/${logId}/tasks/${taskId}`, {
+      method: "PUT",
+      body: JSON.stringify({ status }),
+    });
+  },
+
+  submitLog: async (id: string) => {
+    return apiRequest(`/work-logs/${id}/submit`, {
+      method: "PUT",
+    });
+  },
+
+  updateTask: async (logId: string, taskId: string, taskData: { status?: string; notes?: string }) => {
+    return apiRequest(`/work-logs/${logId}/tasks/${taskId}`, {
+      method: "PUT",
+      body: JSON.stringify(taskData),
     });
   },
 
@@ -186,6 +217,16 @@ export const admin = {
     return apiRequest(`/admin/logs/today?${params.toString()}`);
   },
 
+  getSeoReports: async (limit = 10, skip = 0, userId?: string, date?: string, department = "SEO") => {
+    const params = new URLSearchParams();
+    params.append("limit", limit.toString());
+    params.append("skip", skip.toString());
+    params.append("department", department);
+    if (userId && userId !== "all") params.append("userId", userId);
+    if (date) params.append("date", date);
+    return apiRequest(`/admin/seo-reports?${params.toString()}`);
+  },
+
   getActivityLogs: async (limit = 10, skip = 0, userId?: string) => {
     const params = new URLSearchParams();
     params.append("limit", limit.toString());
@@ -193,5 +234,75 @@ export const admin = {
     if (userId) params.append("userId", userId);
 
     return apiRequest(`/admin/activity-logs?${params.toString()}`);
+  },
+};
+
+// ===== MESSAGING API =====
+export const messaging = {
+  sendMessage: async (messageData: {
+    message: string;
+    contextType: "task" | "log" | "direct";
+    contextId?: string;
+    receiverIds?: string[];
+    mentions?: string[];
+    attachments?: {
+      name: string;
+      url: string;
+      type: "image" | "link" | "document" | "spreadsheet" | "presentation";
+    }[];
+  }) => {
+    return apiRequest("/messages", {
+      method: "POST",
+      body: JSON.stringify(messageData),
+    });
+  },
+
+  getMessages: async (contextType?: string, contextId?: string, receiverId?: string) => {
+    const params = new URLSearchParams();
+    if (contextType) params.append("contextType", contextType);
+    if (contextId) params.append("contextId", contextId);
+    if (receiverId) params.append("receiverId", receiverId);
+
+    return apiRequest(`/messages?${params.toString()}`);
+  },
+
+  searchUsers: async (q: string) => {
+    return apiRequest(`/users/search?q=${encodeURIComponent(q)}`);
+  },
+
+  getConversations: async () => {
+    return apiRequest("/messages/conversations");
+  },
+
+  deleteConversation: async (userId: string) => {
+    return apiRequest(`/messages/conversation/${userId}`, {
+      method: "DELETE"
+    });
+  },
+
+  markMessagesAsRead: async (data: { contextType: string, contextId?: string, senderId?: string }) => {
+    return apiRequest("/messages/read", {
+      method: "PUT",
+      body: JSON.stringify(data)
+    });
+  },
+};
+
+// ===== NOTIFICATIONS API =====
+export const notifications = {
+  getAll: async () => {
+    return apiRequest("/notifications");
+  },
+
+  markAllAsRead: async () => {
+    return apiRequest("/notifications/read-all", {
+      method: "PUT",
+    });
+  },
+
+  markAsRead: async (id: string) => {
+    return apiRequest(`/notifications/${id}/read`, {
+      method: "PUT",
+    });
   },
 };

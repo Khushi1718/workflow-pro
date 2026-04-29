@@ -1,8 +1,8 @@
 #!/bin/bash
-# Workflow Pro - All-in-One Startup Script
+# Workflow Pro - Next.js Startup Script
 # Run this to start everything at once
 
-echo "🚀 Starting Workflow Pro Full Stack"
+echo "🚀 Starting Workflow Pro Next.js App"
 echo "===================================="
 echo ""
 
@@ -60,12 +60,6 @@ if [ ! -d "node_modules" ]; then
     npm install > /dev/null 2>&1 && print_success "Frontend dependencies installed" || print_warning "Frontend installation failed"
 fi
 
-if [ ! -d "backend/node_modules" ]; then
-    cd backend
-    npm install > /dev/null 2>&1 && print_success "Backend dependencies installed" || print_warning "Backend installation failed"
-    cd ..
-fi
-
 # Seed database
 print_section "Seeding Database"
 read -p "Seed database with test data? (y/n) " -n 1 -r
@@ -77,31 +71,21 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
 fi
 
 # Start servers
-print_section "Starting Servers"
+print_section "Starting Next.js"
 echo ""
-echo "Backend server will start on: http://localhost:5123"
-echo "Frontend will start on: http://localhost:5173"
+echo "App and API will start on: http://localhost:3000"
 echo ""
-echo "Press Ctrl+C to stop all servers"
+echo "Press Ctrl+C to stop the server"
 echo ""
 
-# Start backend
-cd backend
 npm run dev &
-BACKEND_PID=$!
-sleep 2
-
-# Start frontend
-cd ..
-npm run dev &
-FRONTEND_PID=$!
+NEXT_PID=$!
 
 # Function to cleanup on exit
 cleanup() {
     echo ""
     echo "🛑 Shutting down..."
-    kill $BACKEND_PID 2>/dev/null
-    kill $FRONTEND_PID 2>/dev/null
+    kill $NEXT_PID 2>/dev/null
     exit 0
 }
 
@@ -110,4 +94,3 @@ trap cleanup SIGINT
 
 # Keep script running
 wait
-

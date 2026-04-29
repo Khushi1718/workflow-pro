@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/router";
 import { ShieldCheck, Zap, BarChart3 } from "lucide-react";
 import logo from "@/assests/Experience_my_India.webp";
 import { ThemeToggle } from "./theme-toggle";
@@ -18,7 +18,7 @@ export function AuthLayout({ children, title, subtitle }: { children: ReactNode;
 
         <Link to="/" className="relative z-10 flex items-center gap-2">
           <img 
-            src={logo} 
+            src={logo.src} 
             alt="Experience My India Logo" 
             className="h-16 w-auto object-contain bg-white/5 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10" 
           />
@@ -63,7 +63,7 @@ export function AuthLayout({ children, title, subtitle }: { children: ReactNode;
       <div className="relative flex flex-col bg-transparent">
         <div className="flex items-center justify-between p-4 lg:hidden">
           <Link to="/" className="flex items-center gap-2">
-            <img src={logo} alt="Experience My India Logo" className="h-12 w-auto object-contain dark:bg-white/95 dark:px-3 dark:py-1.5 dark:rounded-xl transition-all" />
+            <img src={logo.src} alt="Experience My India Logo" className="h-12 w-auto object-contain dark:bg-white/95 dark:px-3 dark:py-1.5 dark:rounded-xl transition-all" />
           </Link>
           <ThemeToggle />
         </div>

@@ -1,6 +1,6 @@
 import { ReactNode, useState, useEffect } from "react";
 import { NavLink } from "@/components/NavLink";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "@/lib/router";
 import {
   Bell,
   ChevronDown,
@@ -16,9 +16,12 @@ import {
   ClipboardList,
   Activity,
   LogOut,
+  MessageSquare,
+  BarChart3,
 } from "lucide-react";
 import logo from "@/assests/Experience_my_India.webp";
 import { ThemeToggle } from "./theme-toggle";
+import { NotificationCenter } from "./NotificationCenter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -39,6 +42,7 @@ const employeeNav: NavItem[] = [
   { to: "/employee/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/employee/add-log", label: "Add Work Log", icon: PlusCircle },
   { to: "/employee/logs", label: "My Logs", icon: ListChecks },
+  { to: "/employee/messages", label: "Messages", icon: MessageSquare },
   { to: "/employee/profile", label: "Profile", icon: UserIcon },
 ];
 
@@ -47,6 +51,8 @@ const adminNav: NavItem[] = [
   { to: "/admin/users", label: "All Users", icon: Users },
   { to: "/admin/today", label: "Today's Logs", icon: CalendarClock },
   { to: "/admin/logs", label: "All Logs", icon: ClipboardList },
+  { to: "/admin/seo-reports", label: "SEO Reports", icon: BarChart3 },
+  { to: "/admin/messages", label: "Messages", icon: MessageSquare },
   { to: "/admin/profile", label: "Profile", icon: UserIcon },
 ];
 
@@ -76,7 +82,7 @@ function SidebarNav({ items, onNavigate }: { items: NavItem[]; onNavigate?: () =
 function Brand() {
   return (
     <Link to="/" className="flex items-center gap-2 px-5 py-5">
-      <img src={logo} alt="Experience My India Logo" className="h-14 w-auto object-contain dark:bg-white/95 dark:px-3 dark:py-1.5 dark:rounded-xl dark:shadow-[0_0_15px_rgba(255,255,255,0.05)] transition-all" />
+      <img src={logo.src} alt="Experience My India Logo" className="h-14 w-auto object-contain dark:bg-white/95 dark:px-3 dark:py-1.5 dark:rounded-xl dark:shadow-[0_0_15px_rgba(255,255,255,0.05)] transition-all" />
     </Link>
   );
 }
@@ -178,6 +184,7 @@ export function AppShell({
 
           <div className="ml-auto flex items-center gap-1">
             <ThemeToggle />
+            <NotificationCenter />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

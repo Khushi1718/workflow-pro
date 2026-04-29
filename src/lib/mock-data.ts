@@ -1,4 +1,5 @@
 export type LogStatus = "completed" | "in_progress" | "pending";
+export type LogState = "draft" | "submitted" | "auto_submitted";
 
 export type AttachmentType = "image" | "link" | "document" | "spreadsheet" | "presentation";
 
@@ -9,18 +10,47 @@ export interface WorkLogAttachment {
   type: AttachmentType;
 }
 
-export interface WorkLog {
+export interface SeoData {
+  questionsAnswered: number;
+  backlinksCreated: number;
+  proofs: WorkLogAttachment[];
+}
+
+export interface Subtask {
   id: string;
   title: string;
-  accomplishments: string;
+  completed: boolean;
+  comment?: string;
+}
+
+export interface Task {
+  id: string;
+  text: string;
+  status: LogStatus;
+  priority: "high" | "medium" | "low";
+  notes?: string;
+  subtasks?: Subtask[];
+}
+
+export interface WorkLog {
+  _id?: string;
+  id: string;
+  title: string;
   meetingsAttended: number;
   focusForTomorrow?: string;
   status: LogStatus;
+  state: LogState;
   date: string;
   user: string;
   userAvatar?: string;
   meetingNotes?: string;
   attachments?: WorkLogAttachment[];
+  seoData?: SeoData;
+  tasks: Task[];
+  createdAt: string;
+  updatedAt: string;
+  submittedAt?: string;
+  autoSubmittedAt?: string;
 }
 
 export interface AppUser {
@@ -91,28 +121,47 @@ export const logs: WorkLog[] = Array.from({ length: 28 }).map((_, i) => {
   d.setDate(today.getDate() - Math.floor(i / 3));
   d.setHours(9 + (i % 8), (i * 7) % 60);
   const statuses: LogStatus[] = ["completed", "in_progress", "pending"];
+  const states: LogState[] = ["submitted", "auto_submitted", "submitted"];
+  
   return {
     id: `log_${1000 + i}`,
     title: titles[i % titles.length],
-    accomplishments:
-      "Worked through the planned scope, captured requirements, and synced with stakeholders. Outcomes documented and follow-ups assigned.",
+    accomplishments: "High-level summary of work performed during the session.",
     meetingsAttended: Math.floor(i % 4),
-    focusForTomorrow: i % 2 === 0 ? "Finalize the documentation and prepare for the sprint review." : "Begin working on the next epic.",
+    focusForTomorrow: "Next logical step in the development cycle.",
     status: statuses[i % 3],
+    state: states[i % 3],
     date: iso(d),
     user: u.name,
-    meetingNotes:
-      i % 2 === 0
-        ? "Sync with PM to confirm scope. Decisions: ship behind a feature flag, gather metrics for 2 weeks."
-        : undefined,
+    createdAt: iso(new Date(d.getTime() - 1000 * 60 * 60 * 8)),
+    updatedAt: iso(new Date(d.getTime() - 1000 * 60 * 60 * 1)),
+    submittedAt: iso(d),
     attachments: i % 3 === 0 ? [
-      { id: `att_${i}_1`, name: "Final Design Specs", url: "https://images.unsplash.com/photo-1529119513315-c7c361862fc7?w=800", type: "image" },
-      { id: `att_${i}_2`, name: "Q3 Planning Metrics", url: "#", type: "spreadsheet" },
-      { id: `att_${i}_3`, name: "API Architecture Overview", url: "#", type: "document" }
-    ] : i % 5 === 0 ? [
-      { id: `att_${i}_4`, name: "Figma Prototype Link", url: "#", type: "link" },
-      { id: `att_${i}_5`, name: "Stakeholder Presentation", url: "#", type: "presentation" }
+      { id: `att_${i}_1`, name: "Project Specs", url: "#", type: "document" }
     ] : [],
+    tasks: [
+      {
+        id: `task_${i}_1`,
+        text: "Core System Implementation",
+        status: statuses[i % 3],
+        priority: "high",
+        subtasks: [
+          { id: `sub_${i}_1_1`, title: "Logic layer validation", completed: true },
+          { id: `sub_${i}_1_2`, title: "Unit test coverage", completed: i % 2 === 0 },
+          { id: `sub_${i}_1_3`, title: "Final integration", completed: false },
+        ]
+      },
+      {
+        id: `task_${i}_2`,
+        text: "Documentation & QA",
+        status: "pending",
+        priority: "medium",
+        subtasks: [
+          { id: `sub_${i}_2_1`, title: "Technical specs update", completed: false },
+          { id: `sub_${i}_2_2`, title: "QA review cycle", completed: false },
+        ]
+      }
+    ],
   };
 });
 

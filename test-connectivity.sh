@@ -65,22 +65,22 @@ test_endpoint() {
 
 # Test 1: Health Check
 echo -e "${BLUE}▶ Phase 1: Backend Health${NC}"
-test_endpoint "Health Check" "GET" "http://localhost:5123/health" ""
+test_endpoint "Health Check" "GET" "http://localhost:3000/health" ""
 
 echo ""
 echo -e "${BLUE}▶ Phase 2: Authentication${NC}"
 
 # Test 2: Employee Login
-test_endpoint "Employee Login" "POST" "http://localhost:5123/api/auth/login" \
+test_endpoint "Employee Login" "POST" "http://localhost:3000/api/auth/login" \
     '{"email":"khushi@tracely.app","password":"password123"}' ""
 
 # Test 3: Admin Login
-test_endpoint "Admin Login" "POST" "http://localhost:5123/api/auth/login" \
+test_endpoint "Admin Login" "POST" "http://localhost:3000/api/auth/login" \
     '{"email":"admin@tracely.app","password":"password123"}' ""
 
 # Test 4: Get Profile (Employee)
 if [ ! -z "$TOKEN" ]; then
-    test_endpoint "Get Profile (Employee)" "GET" "http://localhost:5123/api/auth/profile" "" "$TOKEN"
+    test_endpoint "Get Profile (Employee)" "GET" "http://localhost:3000/api/auth/profile" "" "$TOKEN"
 fi
 
 echo ""
@@ -88,13 +88,13 @@ echo -e "${BLUE}▶ Phase 3: Work Log Operations${NC}"
 
 # Test 5: Create Work Log
 if [ ! -z "$TOKEN" ]; then
-    test_endpoint "Create Work Log" "POST" "http://localhost:5123/api/work-logs" \
+    test_endpoint "Create Work Log" "POST" "http://localhost:3000/api/work-logs" \
         '{"title":"Test Log","accomplishments":"Testing backend","meetingsAttended":1,"status":"completed","date":"2024-04-26T00:00:00Z"}' "$TOKEN"
 fi
 
 # Test 6: Get My Logs
 if [ ! -z "$TOKEN" ]; then
-    test_endpoint "Get My Logs" "GET" "http://localhost:5123/api/work-logs/my-logs?limit=10" "" "$TOKEN"
+    test_endpoint "Get My Logs" "GET" "http://localhost:3000/api/work-logs/my-logs?limit=10" "" "$TOKEN"
 fi
 
 echo ""
@@ -102,22 +102,22 @@ echo -e "${BLUE}▶ Phase 4: Admin Features${NC}"
 
 # Test 7: Get All Users
 if [ ! -z "$ADMIN_TOKEN" ]; then
-    test_endpoint "Get All Users" "GET" "http://localhost:5123/api/admin/users?limit=10" "" "$ADMIN_TOKEN"
+    test_endpoint "Get All Users" "GET" "http://localhost:3000/api/admin/users?limit=10" "" "$ADMIN_TOKEN"
 fi
 
 # Test 8: Get All Logs (Admin)
 if [ ! -z "$ADMIN_TOKEN" ]; then
-    test_endpoint "Get All Logs (Admin)" "GET" "http://localhost:5123/api/admin/logs/all?limit=10" "" "$ADMIN_TOKEN"
+    test_endpoint "Get All Logs (Admin)" "GET" "http://localhost:3000/api/admin/logs/all?limit=10" "" "$ADMIN_TOKEN"
 fi
 
 # Test 9: Get Today's Logs (Admin)
 if [ ! -z "$ADMIN_TOKEN" ]; then
-    test_endpoint "Get Today's Logs (Admin)" "GET" "http://localhost:5123/api/admin/logs/today?limit=10" "" "$ADMIN_TOKEN"
+    test_endpoint "Get Today's Logs (Admin)" "GET" "http://localhost:3000/api/admin/logs/today?limit=10" "" "$ADMIN_TOKEN"
 fi
 
 # Test 10: Get Activity Logs (Admin)
 if [ ! -z "$ADMIN_TOKEN" ]; then
-    test_endpoint "Get Activity Logs" "GET" "http://localhost:5123/api/admin/activity-logs?limit=20" "" "$ADMIN_TOKEN"
+    test_endpoint "Get Activity Logs" "GET" "http://localhost:3000/api/admin/activity-logs?limit=20" "" "$ADMIN_TOKEN"
 fi
 
 echo ""

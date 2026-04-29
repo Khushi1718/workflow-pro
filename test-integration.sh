@@ -3,7 +3,7 @@
 # WorkFlow Pro - Complete Frontend-Backend Integration Test
 # This script tests all connectivity to verify the system works end-to-end
 
-API_URL="http://localhost:5123/api"
+API_URL="http://localhost:3000/api"
 
 echo "╔════════════════════════════════════════════════════════════════╗"
 echo "║      WorkFlow Pro - Frontend/Backend Connectivity Test       ║"
@@ -65,8 +65,8 @@ if echo "$LOGIN_RESPONSE" | grep -q '"token"'; then
   echo "  Token: ${TOKEN:0:20}..."
   echo "  User: $USER_NAME (Role: $USER_ROLE)"
 else
-  echo -e "${RED}✗ Login failed - Backend may not be running${NC}"
-  echo "  Make sure: npm run dev is running in backend folder"
+  echo -e "${RED}✗ Login failed - Next.js app may not be running${NC}"
+  echo "  Make sure: npm run dev is running in the project root"
   exit 1
 fi
 
@@ -190,7 +190,7 @@ echo ""
 echo "✓ If all tests passed, your connectivity is working!"
 echo ""
 echo "Next Steps:"
-echo "1. Go to http://localhost:5173"
+echo "1. Go to http://localhost:3000"
 echo "2. Login with khushi@tracely.app / password123"
 echo "3. Click 'Add Log' and create a new work log"
 echo "4. It should appear immediately in 'My Logs'"

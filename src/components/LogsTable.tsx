@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/router";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { StatusBadge } from "./StatusBadge";
 import { formatDate, formatTime } from "@/lib/mock-data";
@@ -6,10 +6,16 @@ import { ChevronRight, Paperclip } from "lucide-react";
 
 // Backend returns _id (MongoDB ObjectId) and userId populated as an object
 export interface BackendLog {
-  _id: string;
+  _id?: string;
   id?: string;
   title: string;
-  accomplishments: string;
+  tasks?: Array<{
+    id: string;
+    text: string;
+    status: "completed" | "in_progress" | "pending";
+    priority: "high" | "medium" | "low";
+    notes?: string;
+  }>;
   meetingsAttended: number;
   focusForTomorrow?: string;
   status: "completed" | "in_progress" | "pending";
@@ -73,7 +79,12 @@ export function LogsTable({
                       <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
                     )}
                   </div>
-                  <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{log.accomplishments}</p>
+                  <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                    {log.tasks && log.tasks.length > 0 
+                      ? `${log.tasks.length} task${log.tasks.length !== 1 ? 's' : ''}`
+                      : 'No tasks'
+                    }
+                  </p>
                 </div>
                 {showUser && (
                   <div className="flex items-center gap-2 md:col-span-2">
