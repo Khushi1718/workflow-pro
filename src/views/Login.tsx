@@ -9,7 +9,7 @@ import { Shield, Globe, Lock, Info, CheckCircle2, AlertCircle } from "lucide-rea
 
 export default function Login() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("khushi@google.com");
+  const [email, setEmail] = useState("khushi.employee@gmail.com");
   const [password, setPassword] = useState("password123");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);

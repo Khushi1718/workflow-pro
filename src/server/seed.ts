@@ -17,7 +17,7 @@ async function seedDatabase() {
 
     const adminUser = await User.create({
       name: "Admin User",
-      email: "admin@tracely.app",
+      email: "admin.workflow@gmail.com",
       password: "password123",
       role: "admin",
       team: "Management",
@@ -26,7 +26,7 @@ async function seedDatabase() {
 
     const employeeUser = await User.create({
       name: "Ms. Khushi",
-      email: "khushi@tracely.app",
+      email: "khushi.employee@gmail.com",
       password: "password123",
       role: "employee",
       team: "Development",
@@ -35,7 +35,7 @@ async function seedDatabase() {
 
     const employeeUser2 = await User.create({
       name: "John Doe",
-      email: "john@tracely.app",
+      email: "john.doe.dev@gmail.com",
       password: "password123",
       role: "employee",
       team: "Design",
