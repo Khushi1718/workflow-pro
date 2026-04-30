@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 import { connectDB } from "@/server/db";
 import User from "@/server/models/User";
 import WorkLog from "@/server/models/WorkLog";
 import ActivityLog from "@/server/models/ActivityLog";
 import Message from "@/server/models/Message";
 import Notification from "@/server/models/Notification";
+import Task from "@/server/models/Task";
+import Assignment from "@/server/models/Assignment";
 import { generateToken, verifyToken, type JWTPayload } from "@/server/jwt";
 
 export const runtime = "nodejs";
@@ -81,7 +83,16 @@ function requireAuth(request: NextRequest) {
 function requireAdmin(request: NextRequest) {
   const auth = requireAuth(request);
   if (auth.response) return auth;
-  if (auth.user.role !== "admin") {
+  if (auth.user.role !== "admin" && auth.user.role !== "master_admin") {
+    return { response: fail(403, "Access denied", "Insufficient permissions") };
+  }
+  return auth;
+}
+
+function requireMasterAdmin(request: NextRequest) {
+  const auth = requireAuth(request);
+  if (auth.response) return auth;
+  if (auth.user.role !== "master_admin") {
     return { response: fail(403, "Access denied", "Insufficient permissions") };
   }
   return auth;
@@ -122,14 +133,125 @@ function normalizeSeoData(seoData: any) {
   };
 }
 
-export async function POST(request: NextRequest, context: Context) {
-  await connectDB();
-  const path = getPath(context);
-  const body = await readBody(request);
+export async function POST(request: NextRequest, context: any) {
+  try {
+    await connectDB();
+    
+    // Defensive path reading
+    const pathParts = context?.params?.path || [];
+    const path = "/" + pathParts.join("/");
+    const method = request.method;
+    
+    // Defensive body reading
+    let body: any = {};
+    try {
+      body = await request.json();
+    } catch (e) {
+      console.warn("Could not parse JSON body, using empty object");
+    }
+
+    // --- TASK MANAGEMENT (PRIORITY) ---
+    if (path === "/tasks") {
+      const auth = requireAuth(request);
+      if (auth.response) return auth.response;
+
+      if (method === "POST" && (auth.user.role === "master_admin" || auth.user.role === "admin")) {
+        try {
+          const { assignedTo, title, tasks: tasksData } = body;
+          
+          if (!assignedTo || !title || !tasksData || !Array.isArray(tasksData) || tasksData.length === 0) {
+            return fail(400, "Missing required fields: Title, Assignee, and Tasks are required.");
+          }
+
+          // Validate Assignee
+          const targetUser = await User.findById(assignedTo);
+          if (!targetUser) return fail(400, "The assigned employee was not found.");
+          
+          if (auth.user.role === "admin" && targetUser.role !== "employee") {
+            return fail(403, "Admins can only assign tasks to Employees.");
+          }
+
+          // Create Assignment
+          const assignment = new Assignment({
+            assignedBy: new Types.ObjectId(auth.user.userId),
+            assignedTo: new Types.ObjectId(assignedTo),
+            title: title.trim(),
+            status: "pending",
+          });
+          await assignment.save();
+
+          // Date Parser
+          const parseDate = (d: string) => {
+            if (!d) return null;
+            if (d.includes("-") && d.split("-")[0].length === 4) return new Date(d);
+            const p = d.split("/");
+            if (p.length === 3) return new Date(Number(p[2]), Number(p[1]) - 1, Number(p[0]));
+            return new Date(d);
+          };
+
+          const createdTasks = [];
+          for (const tData of tasksData) {
+            if (!tData.title?.trim() || !tData.deadline) continue;
+
+            const deadline = parseDate(tData.deadline);
+            if (!deadline || isNaN(deadline.getTime())) continue;
+
+            const task = new Task({
+              assignmentId: assignment._id,
+              title: tData.title.trim(),
+              description: (tData.description || "No description").trim(),
+              priority: (tData.priority || "medium").toLowerCase(),
+              deadline,
+              status: "pending",
+              timeSpent: 0,
+            });
+            await task.save();
+            createdTasks.push(task.toObject());
+          }
+
+          if (createdTasks.length === 0) {
+            await Assignment.deleteOne({ _id: assignment._id });
+            return fail(400, "No valid tasks (title/deadline missing).");
+          }
+
+          try {
+            await logActivity(request, {
+              userId: auth.user.userId,
+              action: "create_assignment",
+              resourceType: "user",
+              resourceId: assignment._id.toString(),
+            });
+          } catch (e) {}
+
+          return ok("Assignment created successfully", { 
+            assignment: assignment.toObject(), 
+            tasks: createdTasks 
+          }, 201);
+
+        } catch (error: any) {
+          console.error("TASK_API_ERROR:", error);
+          const taskPaths = Object.keys(Task.schema.paths).join(", ");
+          const assignmentPaths = Object.keys(Assignment.schema.paths).join(", ");
+          return fail(400, `Validation Failed: ${error.message} [Task Schema: ${taskPaths}] [Assignment Schema: ${assignmentPaths}]`);
+        }
+      }
+    }
 
   if (path === "/auth/register") {
-    const { name, email, password, team, role } = body;
+    const auth = requireAuth(request);
+    if (auth.response) return auth.response;
+
+    const { name, email, password, team, role: targetRole } = body;
     if (!name || !email || !password || !team) return fail(400, "All fields are required");
+
+    // Role-based creation logic
+    if (auth.user.role === "admin") {
+      if (targetRole !== "employee") {
+        return fail(403, "Admins can only create Employee accounts");
+      }
+    } else if (auth.user.role !== "master_admin") {
+      return fail(403, "Only Admins and Superadmins can create users");
+    }
 
     const existingUser = await User.findOne({ email });
     if (existingUser) return fail(400, "Email already registered");
@@ -139,31 +261,25 @@ export async function POST(request: NextRequest, context: Context) {
       email,
       password,
       team,
-      role: role === "admin" ? "admin" : "employee",
+      role: ["admin", "employee"].includes(targetRole) ? targetRole : "employee",
     });
-    const token = generateToken(user._id.toString(), user.role);
-
+    
     await logActivity(request, {
-      userId: user._id.toString(),
-      action: "login",
+      userId: auth.user.userId,
+      action: "create_user",
       resourceType: "user",
-      details: { method: "register" },
+      resourceId: user._id.toString(),
+      details: { name: user.name, role: user.role }
     });
 
-    return ok(
-      "User registered successfully",
-      {
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          team: user.team,
-        },
-        token,
-      },
-      201
-    );
+    return ok("User created successfully", { 
+      user: {
+        id: user._id, 
+        name: user.name, 
+        email: user.email, 
+        role: user.role 
+      }
+    }, 201);
   }
 
   if (path === "/auth/login") {
@@ -360,13 +476,26 @@ export async function POST(request: NextRequest, context: Context) {
     }
   }
 
+
+  if (path === "/upload" && method === "POST") {
+    const { name, type } = body;
+    const id = Math.random().toString(36).substring(7);
+    const mockUrl = `https://storage.googleapi.com/workflow-pro-uploads/${id}_${name}`;
+    return ok("File uploaded successfully", { id, name, url: mockUrl, type });
+  }
+
   return fail(404, "Route not found");
+  } catch (error: any) {
+    console.error(`POST ${getPath(context)} error:`, error);
+    return fail(500, "Internal Server Error", error.message);
+  }
 }
 
 export async function GET(request: NextRequest, context: Context) {
-  await connectDB();
-  const path = getPath(context);
-  const query = getQuery(request);
+  try {
+    await connectDB();
+    const path = getPath(context);
+    const query = getQuery(request);
 
   if (path === "/auth/profile") {
     const auth = requireAuth(request);
@@ -823,13 +952,223 @@ export async function GET(request: NextRequest, context: Context) {
     return ok("Conversations retrieved", conversations);
   }
 
-  return fail(404, "Route not found");
+  if (path === "/tasks") {
+    const auth = requireAuth(request);
+    if (auth.response) return auth.response;
+
+    const type = query.get("type") || "assigned_to_me";
+    const q = query.get("q");
+    const date = query.get("date");
+    const department = query.get("department");
+    
+    const filter: any = {};
+    if (type === "assigned_to_me") {
+      filter.assignedTo = new Types.ObjectId(auth.user.userId);
+    } else if (type === "assigned_by_me") {
+      filter.assignedBy = new Types.ObjectId(auth.user.userId);
+    } else if (type === "all" && (auth.user.role === "master_admin" || auth.user.role === "admin")) {
+      if (auth.user.role !== "master_admin") {
+        filter.$or = [
+          { assignedTo: new Types.ObjectId(auth.user.userId) },
+          { assignedBy: new Types.ObjectId(auth.user.userId) }
+        ];
+      }
+    }
+
+    if (q) {
+      filter.title = { $regex: q, $options: "i" };
+    }
+
+    if (date) {
+      const start = new Date(date);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(date);
+      end.setHours(23, 59, 59, 999);
+      filter.createdAt = { $gte: start, $lte: end };
+    }
+
+    const pipeline: any[] = [
+      { $match: filter },
+      {
+        $lookup: {
+          from: "tasks",
+          localField: "_id",
+          foreignField: "assignmentId",
+          as: "tasks"
+        }
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "assignedTo",
+          foreignField: "_id",
+          as: "assignedToInfo"
+        }
+      },
+      { $unwind: "$assignedToInfo" }
+    ];
+
+    if (department) {
+      pipeline.push({
+        $match: { "assignedToInfo.team": { $regex: department, $options: "i" } }
+      });
+    }
+
+    pipeline.push(
+      {
+        $addFields: {
+          totalTasks: { $size: "$tasks" },
+          completedTasks: {
+            $size: {
+              $filter: {
+                input: "$tasks",
+                as: "task",
+                cond: { $eq: ["$$task.status", "completed"] }
+              }
+            }
+          },
+          pendingTasks: {
+            $size: {
+              $filter: {
+                input: "$tasks",
+                as: "task",
+                cond: { $ne: ["$$task.status", "completed"] }
+              }
+            }
+          }
+        }
+      },
+      {
+        $addFields: {
+          progress: {
+            $cond: [
+              { $gt: ["$totalTasks", 0] },
+              { $multiply: [{ $divide: ["$completedTasks", "$totalTasks"] }, 100] },
+              0
+            ]
+          }
+        }
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "assignedBy",
+          foreignField: "_id",
+          as: "assignedBy"
+        }
+      },
+      { $unwind: "$assignedBy" },
+      {
+        $addFields: {
+          assignedTo: "$assignedToInfo"
+        }
+      },
+      {
+        $project: {
+          "assignedBy.password": 0,
+          "assignedTo.password": 0,
+          assignedToInfo: 0,
+          tasks: 0 
+        }
+      },
+      { $sort: { createdAt: -1 } }
+    );
+
+    const assignments = await Assignment.aggregate(pipeline);
+
+    return ok("Assignments retrieved successfully", assignments);
+  }
+
+  // GET /assignments/:id/tasks
+  const assignmentTasksMatch = path.match(/^\/assignments\/([^/]+)\/tasks$/);
+  if (assignmentTasksMatch) {
+    const auth = requireAuth(request);
+    if (auth.response) return auth.response;
+    
+    const assignmentId = assignmentTasksMatch[1];
+    const tasks = await Task.find({ assignmentId }).sort({ createdAt: 1 });
+    return ok("Assignment tasks retrieved", tasks);
+  }
+
+  const taskDetailMatch = path.match(/^\/tasks\/([^/]+)$/);
+  if (taskDetailMatch) {
+    const auth = requireAuth(request);
+    if (auth.response) return auth.response;
+
+    const taskId = taskDetailMatch[1];
+    const task = await Task.findById(taskId)
+      .populate("assignedBy", "name email role")
+      .populate("assignedTo", "name email role");
+
+    if (!task) return fail(404, "Task not found");
+
+    return ok("Task retrieved successfully", task);
+  }
+
+  if (path === "/master-admin/stats") {
+    const auth = requireMasterAdmin(request);
+    if (auth.response) return auth.response;
+
+    const totalTasks = await Task.countDocuments();
+    const pendingTasks = await Task.countDocuments({ status: "pending" });
+    const inProgressTasks = await Task.countDocuments({ status: "in_progress" });
+    const completedTasks = await Task.countDocuments({ status: "completed" });
+    
+    const totalUsers = await User.countDocuments();
+    const activeUsers = await User.countDocuments({ isActive: true });
+    
+    // Performance overview: Top performers based on completed tasks
+    const performance = await Task.aggregate([
+      { $match: { status: "completed" } },
+      { $group: { _id: "$assignedTo", completedCount: { $sum: 1 } } },
+      { $sort: { completedCount: -1 } },
+      { $limit: 10 },
+      {
+        $lookup: {
+          from: "users",
+          localField: "_id",
+          foreignField: "_id",
+          as: "user"
+        }
+      },
+      { $unwind: "$user" },
+      {
+        $project: {
+          userId: "$_id",
+          name: "$user.name",
+          role: "$user.role",
+          completedCount: 1
+        }
+      }
+    ]);
+
+    return ok("Master stats retrieved", {
+      tasks: {
+        total: totalTasks,
+        pending: pendingTasks,
+        inProgress: inProgressTasks,
+        completed: completedTasks
+      },
+      users: {
+        total: totalUsers,
+        active: activeUsers
+      },
+      performance
+    });
+  }
+
+    return fail(404, "Route not found");
+  } catch (error: any) {
+    console.error(`GET ${getPath(context)} error:`, error);
+    return fail(500, "Internal Server Error", error.message);
+  }
 }
 
 export async function PUT(request: NextRequest, context: Context) {
-  await connectDB();
-  const path = getPath(context);
-  const body = await readBody(request);
+  try {
+    await connectDB();
+    const path = getPath(context);
+    const body = await readBody(request);
 
   if (path === "/auth/profile") {
     const auth = requireAuth(request);
@@ -1088,12 +1427,105 @@ export async function PUT(request: NextRequest, context: Context) {
     return ok("Messages marked as read");
   }
 
-  return fail(404, "Route not found");
+  const taskMatch = path.match(/^\/tasks\/([^/]+)$/);
+  if (taskMatch) {
+    const auth = requireAuth(request);
+    if (auth.response) return auth.response;
+
+    const taskId = taskMatch[1];
+    const task = await Task.findById(taskId);
+    if (!task) return fail(404, "Task not found");
+
+    // Fetch assignment to check permissions
+    const assignment = await Assignment.findById(task.assignmentId);
+    if (!assignment) return fail(404, "Parent assignment not found");
+
+    const isAssignee = assignment.assignedTo.toString() === auth.user.userId;
+    const isAssigner = assignment.assignedBy.toString() === auth.user.userId;
+    const isMasterAdmin = auth.user.role === "master_admin";
+
+    if (!isAssignee && !isAssigner && !isMasterAdmin) {
+      return fail(403, "Not authorized to update this task");
+    }
+
+    const { status, remarks, evidence, completionRemarks, evidenceFiles } = body;
+    if (status) task.status = status;
+    if (remarks !== undefined) task.remarks = remarks;
+    if (evidence !== undefined) task.evidence = evidence;
+    if (completionRemarks !== undefined) task.completionRemarks = completionRemarks;
+    if (evidenceFiles !== undefined) task.evidenceFiles = evidenceFiles;
+
+    if (status === "completed") {
+      task.completedAt = new Date();
+      // If timer is running, stop it
+      if (task.timerStartedAt) {
+        const now = new Date();
+        const diff = Math.floor((now.getTime() - task.timerStartedAt.getTime()) / 1000);
+        task.timeSpent += diff;
+        task.timerStartedAt = undefined;
+      }
+    }
+
+    await task.save();
+
+    await logActivity(request, {
+      userId: auth.user.userId,
+      action: "update_task",
+      resourceType: "task",
+      resourceId: task._id.toString(),
+    });
+
+    return ok("Task updated successfully", task);
+  }
+
+  // PUT /tasks/:id/timer
+  const timerMatch = path.match(/^\/tasks\/([^/]+)\/timer$/);
+  if (timerMatch) {
+    const auth = requireAuth(request);
+    if (auth.response) return auth.response;
+
+    const taskId = timerMatch[1];
+    const task = await Task.findById(taskId);
+    if (!task) return fail(404, "Task not found");
+
+    // Only assignee can track time
+    if (auth.user.role === "employee") {
+      // Find the assignment to check assignee
+      const assignment = await Assignment.findById(task.assignmentId);
+      if (assignment?.assignedTo.toString() !== auth.user.userId) {
+        return fail(403, "Not authorized to track time for this task");
+      }
+    }
+
+    const { action } = body; // "start" or "stop"
+
+    if (action === "start") {
+      if (task.status === "completed") return fail(400, "Cannot track time for completed task");
+      task.timerStartedAt = new Date();
+      task.status = "in_progress";
+    } else if (action === "stop") {
+      if (!task.timerStartedAt) return fail(400, "Timer not running");
+      const now = new Date();
+      const diff = Math.floor((now.getTime() - task.timerStartedAt.getTime()) / 1000);
+      task.timeSpent += diff;
+      task.timerStartedAt = undefined;
+    }
+
+    await task.save();
+    return ok(`Timer ${action}ed`, task);
+  }
+
+    return fail(404, "Route not found");
+  } catch (error: any) {
+    console.error(`PUT ${getPath(context)} error:`, error);
+    return fail(500, "Internal Server Error", error.message);
+  }
 }
 
 export async function DELETE(request: NextRequest, context: Context) {
-  await connectDB();
-  const path = getPath(context);
+  try {
+    await connectDB();
+    const path = getPath(context);
 
   const conversationMatch = path.match(/^\/messages\/conversation\/([^/]+)$/);
   if (conversationMatch) {
@@ -1154,4 +1586,8 @@ export async function DELETE(request: NextRequest, context: Context) {
   }
 
   return fail(404, "Route not found");
+  } catch (error: any) {
+    console.error(`DELETE ${getPath(context)} error:`, error);
+    return fail(500, "Internal Server Error", error.message);
+  }
 }

@@ -8,6 +8,8 @@ async function seedDatabase() {
     console.log("Starting database seed...");
 
     await connectDB();
+    const maskedUri = (process.env.MONGODB_URI || "").replace(/:([^@]+)@/, ":****@");
+    console.log(`Connected to: ${maskedUri}`);
 
     console.log("Clearing existing data...");
     await User.deleteMany({});
@@ -17,7 +19,7 @@ async function seedDatabase() {
 
     const adminUser = await User.create({
       name: "Admin User",
-      email: "admin.workflow@gmail.com",
+      email: "admin@google.com",
       password: "password123",
       role: "admin",
       team: "Management",
@@ -26,7 +28,7 @@ async function seedDatabase() {
 
     const employeeUser = await User.create({
       name: "Ms. Khushi",
-      email: "khushi.employee@gmail.com",
+      email: "khushi@google.com",
       password: "password123",
       role: "employee",
       team: "Development",
@@ -35,7 +37,7 @@ async function seedDatabase() {
 
     const employeeUser2 = await User.create({
       name: "John Doe",
-      email: "john.doe.dev@gmail.com",
+      email: "john@google.com",
       password: "password123",
       role: "employee",
       team: "Design",
@@ -74,7 +76,7 @@ async function seedDatabase() {
         meetingsAttended: 1,
         focusForTomorrow: "Implement notification system",
         status: "completed",
-        date: new Date(today),
+        date: new Date(new Date(today).getTime() - 24 * 60 * 60 * 1000), // Yesterday
         attachments: [],
       },
       {
@@ -100,7 +102,7 @@ async function seedDatabase() {
         meetingsAttended: 0,
         focusForTomorrow: "Add caching layer",
         status: "in_progress",
-        date: new Date(new Date(today).getTime() - 24 * 60 * 60 * 1000),
+        date: new Date(new Date(today).getTime() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
         attachments: [],
       },
       {
@@ -113,7 +115,7 @@ async function seedDatabase() {
         meetingsAttended: 3,
         focusForTomorrow: "Create design specifications",
         status: "completed",
-        date: new Date(new Date(today).getTime() - 2 * 24 * 60 * 60 * 1000),
+        date: new Date(new Date(today).getTime() - 24 * 60 * 60 * 1000), // Yesterday
         attachments: [],
       },
     ];
@@ -121,9 +123,9 @@ async function seedDatabase() {
     await WorkLog.insertMany(sampleLogs);
 
     console.log("Database seeded successfully.");
-    console.log("Admin: admin@tracely.app / password123");
-    console.log("Employee: khushi@tracely.app / password123");
-    console.log("Employee 2: john@tracely.app / password123");
+    console.log("Admin: admin@google.com / password123");
+    console.log("Employee: khushi@google.com / password123");
+    console.log("Employee 2: john@google.com / password123");
 
     await mongoose.connection.close();
     process.exit(0);

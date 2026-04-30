@@ -9,7 +9,7 @@ import { Shield, Globe, Lock, Info, CheckCircle2, AlertCircle } from "lucide-rea
 
 export default function Login() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("khushi.employee@gmail.com");
+  const [email, setEmail] = useState("khushi@google.com");
   const [password, setPassword] = useState("password123");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -28,7 +28,9 @@ export default function Login() {
 
         const userRole = response.data.user?.role;
         setTimeout(() => {
-          if (userRole === "admin") {
+          if (userRole === "master_admin") {
+            navigate("/master-admin/dashboard");
+          } else if (userRole === "admin") {
             navigate("/admin/dashboard");
           } else {
             navigate("/employee/dashboard");

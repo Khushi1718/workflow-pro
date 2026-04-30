@@ -18,6 +18,8 @@ import {
   LogOut,
   MessageSquare,
   BarChart3,
+  TrendingUp,
+  History,
 } from "lucide-react";
 import logo from "@/assests/Experience_my_India.webp";
 import { ThemeToggle } from "./theme-toggle";
@@ -40,20 +42,30 @@ type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };
 
 const employeeNav: NavItem[] = [
   { to: "/employee/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/employee/add-log", label: "Add Work Log", icon: PlusCircle },
-  { to: "/employee/logs", label: "My Logs", icon: ListChecks },
+  { to: "/employee/today", label: "Today's Tasks", icon: Activity },
+  { to: "/employee/tasks", label: "Task Board", icon: ClipboardList },
   { to: "/employee/messages", label: "Messages", icon: MessageSquare },
   { to: "/employee/profile", label: "Profile", icon: UserIcon },
 ];
 
 const adminNav: NavItem[] = [
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/admin/users", label: "All Users", icon: Users },
-  { to: "/admin/today", label: "Today's Logs", icon: CalendarClock },
-  { to: "/admin/logs", label: "All Logs", icon: ClipboardList },
-  { to: "/admin/seo-reports", label: "SEO Reports", icon: BarChart3 },
+  { to: "/admin/today", label: "Today's Tasks", icon: Activity },
+  { to: "/admin/tasks", label: "Task Board", icon: ClipboardList },
+  { to: "/admin/users", label: "Manage Users", icon: Users },
+  { to: "/admin/seo-reports", label: "SEO Reports", icon: TrendingUp },
   { to: "/admin/messages", label: "Messages", icon: MessageSquare },
   { to: "/admin/profile", label: "Profile", icon: UserIcon },
+];
+
+const masterAdminNav: NavItem[] = [
+  { to: "/master-admin/dashboard", label: "Global Intel", icon: LayoutDashboard },
+  { to: "/master-admin/today", label: "Today's Tasks", icon: Activity },
+  { to: "/master-admin/tasks", label: "Enterprise Board", icon: ClipboardList },
+  { to: "/master-admin/users", label: "Manage Roles", icon: Users },
+  { to: "/master-admin/seo-reports", label: "SEO Reports", icon: TrendingUp },
+  { to: "/master-admin/messages", label: "Messages", icon: MessageSquare },
+  { to: "/master-admin/profile", label: "My Profile", icon: UserIcon },
 ];
 
 function initials(name: string) {
@@ -94,14 +106,15 @@ export function AppShell({
   subtitle,
   actions,
 }: {
-  role: "admin" | "employee";
+  role: "master_admin" | "admin" | "employee";
   children: ReactNode;
   title?: string;
   subtitle?: string;
   actions?: ReactNode;
 }) {
-  const items = role === "admin" ? adminNav : employeeNav;
   const [user, setUser] = useState<any>(null);
+  const activeRole = user?.role || role;
+  const items = activeRole === "master_admin" ? masterAdminNav : activeRole === "admin" ? adminNav : employeeNav;
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -138,7 +151,7 @@ export function AppShell({
         <Brand />
         <div className="px-5 pb-2">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            {role === "admin" ? "Admin" : "Workspace"}
+            {activeRole === "master_admin" ? "Master Admin" : activeRole === "admin" ? "Admin" : "Workspace"}
           </span>
         </div>
         <SidebarNav items={items} />
@@ -206,7 +219,7 @@ export function AppShell({
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link to={role === "admin" ? "/admin/profile" : "/employee/profile"}>
+                  <Link to={activeRole === "master_admin" ? "/master-admin/profile" : activeRole === "admin" ? "/admin/profile" : "/employee/profile"}>
                     <UserIcon className="mr-2 h-4 w-4" /> Profile
                   </Link>
                 </DropdownMenuItem>
@@ -226,7 +239,7 @@ export function AppShell({
         </header>
 
         {/* Page header */}
-        {(title || actions) && (
+        {(title || subtitle || actions) && (
           <div className="border-b border-border bg-background">
             <div className="flex flex-col gap-3 px-4 py-6 md:flex-row md:items-center md:justify-between md:px-8">
               <div>

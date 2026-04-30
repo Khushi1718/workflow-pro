@@ -84,7 +84,7 @@ export default function AdminProfile() {
 
   if (loading) {
     return (
-      <AppShell role="admin" title="Admin Settings" subtitle="Manage your workspace administrative preferences.">
+      <AppShell role={u?.role || "admin"} title={`${u?.role === "master_admin" ? "Master" : "Admin"} Settings`} subtitle="Manage your workspace administrative preferences.">
         <div className="flex h-40 items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
@@ -95,7 +95,7 @@ export default function AdminProfile() {
   if (!u) return null;
 
   return (
-    <AppShell role="admin" title="Admin Settings" subtitle="Manage your workspace administrative preferences.">
+    <AppShell role={u.role} title={`${u.role === "master_admin" ? "Master" : "Admin"} Settings`} subtitle="Manage your workspace administrative preferences.">
       <div className="grid gap-6 lg:grid-cols-[1fr_350px] max-w-6xl mx-auto">
         <div className="space-y-6">
           {/* Profile Header Card */}
@@ -103,7 +103,7 @@ export default function AdminProfile() {
             <div className="h-32 bg-gradient-to-r from-primary/20 via-primary/5 to-transparent border-b border-border relative">
               <div className="absolute top-4 right-4 bg-background/80 backdrop-blur text-xs font-semibold px-2.5 py-1 rounded-full border border-border flex items-center gap-1.5 shadow-sm text-foreground">
                 <Shield className="h-3.5 w-3.5 text-primary" />
-                Workspace Admin
+                {u.role === "master_admin" ? "Super Admin" : "Workspace Admin"}
               </div>
             </div>
             <div className="px-8 pb-8 pt-0 relative sm:flex sm:items-end sm:justify-between">
@@ -244,8 +244,8 @@ export default function AdminProfile() {
             <dl className="space-y-4 text-sm">
               <div className="flex items-center justify-between py-1 border-b border-border/50 pb-3">
                 <dt className="text-muted-foreground font-medium">Role</dt>
-                <dd className="font-semibold text-foreground flex items-center gap-1.5">
-                  <Shield className="h-3.5 w-3.5 text-primary" /> Administrator
+                <dd className="font-semibold text-foreground flex items-center gap-1.5 capitalize">
+                  <Shield className="h-3.5 w-3.5 text-primary" /> {u.role.replace('_', ' ')}
                 </dd>
               </div>
               <div className="flex items-center justify-between py-1 border-b border-border/50 pb-3">

@@ -1,45 +1,43 @@
 import { useEffect, useState } from "react";
-import { AppShell } from "@/components/AppShell";
-import { LogsTable } from "@/components/LogsTable";
-import { EmptyState } from "@/components/StatCard";
-import { CalendarClock, Loader2 } from "lucide-react";
-import { admin } from "@/lib/api";
+import TaskBoard from "@/views/shared/TaskBoard";
+import { auth } from "@/lib/api";
+import { Loader2 } from "lucide-react";
 
 export default function TodayLogs() {
-  const [logs, setLogs] = useState<any[]>([]);
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const today = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
-    const fetchTodayLogs = async () => {
-      try {
-        const res = await admin.getTodayLogs(50, 0);
-        if (res.success && res.data) {
-          const transformed = res.data.map((l: any) => ({
-            ...l,
-            user: l.userId?.name || l.user?.name || "Unknown",
-          }));
-          setLogs(transformed);
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
+    const fetchUser = async () => {
+      const res = await auth.getProfile();
+      if (res.success) setUser(res.data);
+      setLoading(false);
     };
-    fetchTodayLogs();
+    fetchUser();
   }, []);
 
+  if (loading) return (
+    <div className="flex h-screen items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
+
+  const role = user?.role || "admin";
+
   return (
-    <AppShell role="admin" title="Today's logs" subtitle="Everything logged across the team today.">
-      {loading ? (
-        <div className="flex h-40 items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : logs.length ? (
-        <LogsTable logs={logs} basePath="/admin/logs" showUser />
-      ) : (
-        <EmptyState icon={CalendarClock} title="Nothing yet today" description="Logs will appear here as your team adds them." />
-      )}
-    </AppShell>
+    <TaskBoard 
+      role={role} 
+      initialDate={today} 
+      title="Today's Tasks" 
+      subtitle={
+        role === "master_admin" 
+          ? `Global enterprise overview for ${today}.` 
+          : role === "admin" 
+            ? `Assignments and tasks relevant to your team for ${today}.` 
+            : `Your active assignments scheduled for ${today}.`
+      }
+      hideTabs={role === "employee"}
+    />
   );
 }

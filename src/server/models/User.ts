@@ -4,7 +4,7 @@ export interface IUser extends Document {
   name: string;
   email: string;
   password: string;
-  role: "admin" | "employee";
+  role: "master_admin" | "admin" | "employee";
   team: string;
   isActive: boolean;
   joinedAt: Date;
@@ -38,8 +38,8 @@ const userSchema = new Schema<IUser>(
     role: {
       type: String,
       enum: {
-        values: ["admin", "employee"],
-        message: "Role must be either admin or employee",
+        values: ["master_admin", "admin", "employee"],
+        message: "Role must be master_admin, admin, or employee",
       },
       default: "employee",
     },

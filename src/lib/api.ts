@@ -30,7 +30,7 @@ export const removeAuthToken = () => {
 };
 
 // Make API request with auth token
-const apiRequest = async <T = any,>(
+export const apiRequest = async <T = any,>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> => {
@@ -64,7 +64,7 @@ export const auth = {
     name: string,
     email: string,
     password: string,
-    role: "admin" | "employee" = "employee",
+    role: "master_admin" | "admin" | "employee" = "employee",
     team: string = ""
   ) => {
     return apiRequest("/auth/register", {
@@ -304,5 +304,61 @@ export const notifications = {
     return apiRequest(`/notifications/${id}/read`, {
       method: "PUT",
     });
+  },
+};
+// ===== TASKS & ASSIGNMENTS API =====
+export const tasks = {
+  create: async (data: {
+    assignedTo: string;
+    title: string;
+    priority?: string;
+    tasks: { title: string; description: string; deadline: string }[];
+  }) => {
+    return apiRequest("/tasks", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  getAll: async (type: "assigned_to_me" | "assigned_by_me" | "all" = "assigned_to_me", status?: string, q?: string, date?: string, department?: string) => {
+    const params = new URLSearchParams();
+    params.append("type", type);
+    if (status) params.append("status", status);
+    if (q) params.append("q", q);
+    if (date) params.append("date", date);
+    if (department) params.append("department", department);
+    return apiRequest(`/tasks?${params.toString()}`);
+  },
+
+  getAssignmentTasks: async (assignmentId: string) => {
+    return apiRequest(`/assignments/${assignmentId}/tasks`);
+  },
+
+  update: async (id: string, data: { 
+    status?: string; 
+    remarks?: string; 
+    assignedTo?: string;
+    evidence?: string;
+    completionRemarks?: string;
+    evidenceFiles?: any[];
+  }) => {
+    return apiRequest(`/tasks/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  },
+
+  toggleTimer: async (taskId: string, action: "start" | "stop") => {
+    return apiRequest(`/tasks/${taskId}/timer`, {
+      method: "PUT",
+      body: JSON.stringify({ action }),
+    });
+  },
+};
+
+// ===== MASTER ADMIN API =====
+export const masterAdmin = {
+  getStats: async () => {
+    return apiRequest("/master-admin/stats");
   },
 };

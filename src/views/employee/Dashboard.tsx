@@ -1,439 +1,254 @@
-import { useEffect, useState, useMemo } from "react";
-import { Link, useNavigate } from "@/lib/router";
+import { useEffect, useState } from "react";
+import { Link } from "@/lib/router";
 import { AppShell } from "@/components/AppShell";
-import { StatCard } from "@/components/StatCard";
-import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
+import { auth, tasks } from "@/lib/api";
+import { getGreeting, cn } from "@/lib/utils";
 import { 
+  ArrowRight, 
   CheckCircle2, 
   Clock, 
-  FileText, 
-  PlusCircle, 
-  ListChecks, 
-  ArrowRight, 
-  TrendingUp, 
-  PieChart, 
   Loader2, 
-  Target, 
-  Circle,
-  Zap,
-  CheckSquare,
-  Square,
+  ClipboardList, 
+  TrendingUp, 
+  Zap, 
+  Calendar,
+  Layers,
   ChevronRight,
-  Activity,
-  Search
+  PlayCircle,
+  FileText,
+  Target
 } from "lucide-react";
-import { auth, workLogs } from "@/lib/api";
-import { getGreeting, cn } from "@/lib/utils";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { toast } from "sonner";
-import { WorkLog, Task } from "@/lib/mock-data";
+import { Card, CardContent } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 
 export default function EmployeeDashboard() {
-  const navigate = useNavigate();
-  const [currentEmployee, setCurrentEmployee] = useState<any>(null);
-  const [myLogs, setMyLogs] = useState<WorkLog[]>([]);
-  const [submittedLogs, setSubmittedLogs] = useState<WorkLog[]>([]);
-  const [stats, setStats] = useState({
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [taskStats, setTaskStats] = useState({
+    total: 0,
     completed: 0,
-    inProgress: 0,
     pending: 0,
+    personalVelocity: 0
   });
-  const [todayLog, setTodayLog] = useState<any>(null);
+  const [assignedAssignments, setAssignedAssignments] = useState<any[]>([]);
+  const [velocityData, setVelocityData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchDashboardData = async () => {
       try {
         setIsLoading(true);
-        const profileResponse = await auth.getProfile();
-        if (profileResponse.success && profileResponse.data) {
-          setCurrentEmployee(profileResponse.data);
-        }
+        const [profileRes, tasksRes] = await Promise.all([
+          auth.getProfile(),
+          tasks.getAll("assigned_to_me")
+        ]);
 
-        // Get all logs (for stats calculation)
-        const logsResponse = await workLogs.getMyLogs(100, 0);
-        if (logsResponse.success && logsResponse.data) {
-          const logs = logsResponse.data;
-          setMyLogs(logs);
-          
-          const completedCount = logs.filter((l: any) => l.status === 'completed').length;
-          const inProgressCount = logs.filter((l: any) => l.status === 'in_progress').length;
-          const pendingCount = logs.filter((l: any) => l.status === 'pending').length;
-          
-          setStats({ 
-            completed: completedCount, 
-            inProgress: inProgressCount, 
-            pending: pendingCount 
-          });
-        }
+        if (profileRes.success) setCurrentUser(profileRes.data);
 
-        // Get submitted logs for history (excludes drafts)
-        const submittedResponse = await workLogs.getMyLogs(100, 0, undefined, undefined, undefined, true);
-        if (submittedResponse.success && submittedResponse.data) {
-          setSubmittedLogs(submittedResponse.data);
-        }
+        const allTasks = tasksRes.data || [];
+        const total = allTasks.length;
+        const completed = allTasks.filter((a: any) => a.progress === 100).length;
+        const pending = allTasks.filter((a: any) => a.progress < 100).length;
+        
+        setTaskStats({
+          total,
+          completed,
+          pending,
+          personalVelocity: total > 0 ? Math.round((completed / total) * 100) : 0
+        });
 
-        // Get today's log (can be draft or submitted)
-        const todayResponse = await workLogs.getTodayLog();
-        if (todayResponse.success && todayResponse.data) {
-          setTodayLog(todayResponse.data);
-        }
-      } catch (error: any) {
-        console.error("Error fetching dashboard data:", error);
-        toast.error("Failed to load dashboard data");
+        setAssignedAssignments(allTasks.slice(0, 5));
+
+        // Mock velocity data for chart
+        const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        const today = new Date();
+        const weekData = Array.from({ length: 7 }, (_, i) => {
+          const d = new Date(today);
+          d.setDate(today.getDate() - (6 - i));
+          const dateStr = d.toDateString();
+          const dayTasks = allTasks.filter((a: any) => new Date(a.createdAt).toDateString() === dateStr);
+          return {
+            name: dayNames[d.getDay()],
+            val: dayTasks.length
+          };
+        });
+        setVelocityData(weekData);
+
+      } catch (error) {
+        console.error("Employee dashboard error:", error);
+        toast.error("Failed to sync personal workspace");
       } finally {
         setIsLoading(false);
       }
     };
-    fetchData();
 
-    // Set up listener for real-time updates from AddLog component
-    const handleTodayLogUpdate = (event: any) => {
-      console.log("Today's log updated:", event.detail);
-      setTodayLog(event.detail);
-      // Also refresh the full data to update stats
-      fetchData();
-    };
-
-    // Also set up polling to refresh every 3 seconds while on dashboard
-    const pollInterval = setInterval(async () => {
-      try {
-        const todayResponse = await workLogs.getTodayLog();
-        if (todayResponse.success && todayResponse.data) {
-          setTodayLog(prev => {
-            // Only update if the data actually changed
-            if (JSON.stringify(prev) !== JSON.stringify(todayResponse.data)) {
-              return todayResponse.data;
-            }
-            return prev;
-          });
-        }
-      } catch (e) {
-        // Silently ignore polling errors
-      }
-    }, 3000);
-
-    window.addEventListener("todayLogUpdated", handleTodayLogUpdate);
-    return () => {
-      window.removeEventListener("todayLogUpdated", handleTodayLogUpdate);
-      clearInterval(pollInterval);
-    };
+    fetchDashboardData();
   }, []);
-
-  const toggleTaskStatus = async (taskId: string, currentStatus: string) => {
-    if (!todayLog || (todayLog.state !== 'draft')) return;
-    
-    const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
-    try {
-      const res = await workLogs.updateTaskStatus(todayLog._id || todayLog.id, taskId, newStatus);
-      if (res.success) {
-        setTodayLog((prev: any) => {
-          if (!prev) return prev;
-          const newTasks = prev.tasks.map((t: any) => 
-            t.id === taskId ? { ...t, status: newStatus } : t
-          );
-          return { ...prev, tasks: newTasks };
-        });
-        toast.success(`Task ${newStatus}`);
-      }
-    } catch (error) {
-      toast.error("Failed to update task");
-    }
-  };
 
   if (isLoading) {
     return (
-      <AppShell role="employee" title="Dashboard" subtitle="Loading...">
-        <div className="flex items-center justify-center py-24">
-          <div className="flex flex-col items-center gap-4">
-            <Loader2 className="h-10 w-10 animate-spin text-primary" />
-            <span className="text-sm font-medium text-muted-foreground">Synchronizing your workspace...</span>
+      <AppShell role="employee" title="Dashboard" subtitle="Synchronizing your personal workspace...">
+        <div className="flex h-[60vh] flex-col items-center justify-center gap-4">
+          <div className="relative">
+            <div className="h-16 w-16 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+            <Target className="absolute left-1/2 top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 text-primary" />
           </div>
+          <p className="text-sm font-medium text-muted-foreground animate-pulse">Personalizing your insights...</p>
         </div>
       </AppShell>
     );
   }
 
-  const firstName = currentEmployee?.name?.split(" ").pop() || "User";
-  const isSeoUser = currentEmployee?.role === "SEO" || currentEmployee?.team?.toLowerCase() === "seo";
-
-  const total = myLogs.length || 1;
-  const completedPerc = Math.round((stats.completed / total) * 100);
-  const inProgressPerc = Math.round((stats.inProgress / total) * 100);
-  const pendingPerc = 100 - completedPerc - inProgressPerc;
+  const firstName = currentUser?.name?.split(" ").pop() || "Member";
 
   return (
-    <AppShell
-      role="employee"
-      title={`${getGreeting()}, ${firstName}`}
-      subtitle="Your daily performance and project velocity overview."
+    <AppShell 
+      role="employee" 
+      title={`${getGreeting()}, ${firstName}`} 
+      subtitle="Your personal mission control for active tasks and project velocity."
       actions={
-        <Button asChild className="rounded-xl shadow-lg shadow-primary/20 transition-transform hover:scale-[1.02]">
-          <Link to="/employee/add-log"><PlusCircle className="mr-2 h-4 w-4" /> Log Today's Work</Link>
+        <Button asChild className="h-10 rounded-xl bg-primary text-white shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all hover:scale-[1.02]">
+          <Link to="/employee/tasks"><PlayCircle className="mr-2 h-4 w-4" /> Go to Task Board</Link>
         </Button>
       }
     >
-      {/* Metrics Row */}
-      <div className="grid gap-6 md:grid-cols-3">
-        <StatCard label="Total Submissions" value={myLogs.length} icon={FileText} />
-        <StatCard label="Completed Milestones" value={stats.completed} icon={CheckCircle2} tone="success" />
-        <StatCard label="Active Operations" value={stats.inProgress} icon={Clock} tone="info" />
-      </div>
-
-      <div className="mt-8 grid gap-8 lg:grid-cols-12">
-        
-        {/* LEFT: Tasks & Logs */}
-        <div className="lg:col-span-8 space-y-8">
-          
-          {/* Today's To-Do Section */}
-          <section className="bg-white dark:bg-zinc-950 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
-             <header className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/50 px-8 py-6 bg-zinc-50/30">
-                  <div className="flex items-center gap-4">
-                     <div className="h-12 w-12 bg-primary/10 rounded-2xl flex items-center justify-center border border-primary/20">
-                        <CheckSquare className="h-6 w-6 text-primary" />
-                     </div>
-                     <div>
-                        <h2 className="text-base font-bold text-zinc-900 dark:text-white uppercase tracking-tight">Today's To-Do</h2>
-                        <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">
-                           {todayLog ? `${todayLog.tasks?.length || 0} tasks` : 'No log created'}
-                        </p>
-                     </div>
-                  </div>
-               </header>
-
-               <div className="p-8">
-                  {todayLog ? (
-                    <>
-                      <div className="space-y-2">
-                         {todayLog.tasks && todayLog.tasks.length > 0 ? (
-                           todayLog.tasks.map((task: any) => {
-                              const isCompleted = task.status === 'completed';
-                              const canToggle = todayLog.state === 'draft';
-                              
-                              return (
-                                 <div 
-                                   key={task.id} 
-                                   onClick={() => canToggle && toggleTaskStatus(task.id, task.status)}
-                                   className={cn(
-                                     "flex items-center gap-3 p-3 rounded-xl border transition-all",
-                                     canToggle && "cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900/50",
-                                     isCompleted ? "bg-zinc-50/30 border-zinc-100 dark:bg-zinc-900/20 dark:border-zinc-800" : "bg-white border-zinc-200 shadow-sm dark:bg-zinc-900 dark:border-zinc-800"
-                                   )}
-                                 >
-                                    <div className={cn(
-                                      "h-4 w-4 rounded border-2 flex items-center justify-center transition-all shrink-0",
-                                      isCompleted ? "bg-success border-success text-white" : "border-zinc-300 dark:border-zinc-600",
-                                      !canToggle && "cursor-not-allowed"
-                                    )}>
-                                       {isCompleted && <CheckCircle2 className="h-3 w-3" />}
-                                    </div>
-                                    <p className={cn(
-                                      "text-sm font-medium flex-1",
-                                      isCompleted ? "text-zinc-400 line-through" : "text-zinc-900 dark:text-zinc-100"
-                                    )}>
-                                      {task.text}
-                                    </p>
-                                 </div>
-                              );
-                           })
-                         ) : (
-                           <div className="text-center py-8">
-                              <p className="text-[10px] font-bold text-zinc-400 uppercase">No tasks yet</p>
-                           </div>
-                         )}
-                      </div>
-
-                      <div className="mt-6 flex items-center justify-between pt-4 border-t border-zinc-100 dark:border-zinc-800">
-                         <div className="text-[10px] font-bold text-zinc-400 uppercase">
-                            {todayLog.tasks?.length ? Math.round((todayLog.tasks.filter((t: any) => t.status === 'completed').length / todayLog.tasks.length) * 100) : 0}% Done
-                         </div>
-                         {todayLog.state === 'draft' ? (
-                           <Button asChild className="h-9 rounded-lg bg-primary text-white text-xs font-bold">
-                              <Link to={`/employee/logs/edit/${todayLog._id || todayLog.id}`}>
-                                 Edit Log <ArrowRight className="ml-1 h-3.5 w-3.5" />
-                              </Link>
-                           </Button>
-                         ) : (
-                           <Button asChild variant="ghost" className="h-9 rounded-lg text-primary text-xs font-bold">
-                              <Link to={`/employee/logs/${todayLog._id || todayLog.id}`}>
-                                 View Log <ArrowRight className="ml-1 h-3.5 w-3.5" />
-                              </Link>
-                           </Button>
-                         )}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed border-zinc-100 dark:border-zinc-900 rounded-2xl">
-                       <Zap className="h-10 w-10 text-zinc-200 mb-4" />
-                       <p className="text-sm font-bold text-zinc-400">No log for today yet.</p>
-                       <Button asChild variant="link" className="text-primary font-bold mt-2">
-                          <Link to="/employee/add-log">Create Today's Log →</Link>
-                       </Button>
-                    </div>
-                  )}
-               </div>
-          </section>
-
-          {isSeoUser && (
-            <section className="bg-white dark:bg-zinc-950 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
-              <header className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/50 px-8 py-5 bg-zinc-50/30">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 bg-primary/10 rounded-2xl flex items-center justify-center border border-primary/20">
-                    <Search className="h-5 w-5 text-primary" />
+      <div className="space-y-8 pb-10">
+        {/* PERSONAL METRICS */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {[
+            { label: "My Total Tasks", value: taskStats.total, icon: ClipboardList, color: "text-primary", bg: "bg-primary/10" },
+            { label: "Pending Now", value: taskStats.pending, icon: Clock, color: "text-amber-500", bg: "bg-amber-500/10" },
+            { label: "Successfully Done", value: taskStats.completed, icon: CheckCircle2, color: "text-success", bg: "bg-success/10" },
+            { label: "My Velocity", value: `${taskStats.personalVelocity}%`, icon: Zap, color: "text-blue-500", bg: "bg-blue-500/10" },
+          ].map((stat, i) => (
+            <Card key={i} className="group overflow-hidden border-none shadow-premium transition-all hover:shadow-2xl hover:-translate-y-1">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className={cn("rounded-2xl p-4 transition-transform group-hover:scale-110", stat.bg)}>
+                    <stat.icon className={cn("h-6 w-6", stat.color)} />
                   </div>
                   <div>
-                    <h2 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-tight">Today's SEO Summary</h2>
-                    <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">
-                      {todayLog ? "From today's log" : "No log created"}
-                    </p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{stat.label}</p>
+                    <h3 className="text-2xl font-black tracking-tight">{stat.value}</h3>
                   </div>
                 </div>
-              </header>
-              <div className="grid gap-4 p-6 sm:grid-cols-2">
-                <div className="rounded-2xl border border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30 p-5">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Questions Answered Today</p>
-                  <p className="mt-2 text-3xl font-bold text-zinc-900 dark:text-white">{todayLog?.seoData?.questionsAnswered || 0}</p>
-                </div>
-                <div className="rounded-2xl border border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30 p-5">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Backlinks Created Today</p>
-                  <p className="mt-2 text-3xl font-bold text-zinc-900 dark:text-white">{todayLog?.seoData?.backlinksCreated || 0}</p>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {/* All Logs Section */}
-          <section className="bg-white dark:bg-zinc-950 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
-            <header className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/50 px-8 py-6">
-              <div>
-                <h2 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider">All Logs</h2>
-                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-tighter">Your submitted work records</p>
-              </div>
-              <Button asChild variant="ghost" size="sm" className="text-xs font-bold text-zinc-400 hover:text-zinc-900">
-                <Link to="/employee/logs">View All</Link>
-              </Button>
-            </header>
-            <ul className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
-              {submittedLogs.slice(0, 5).map((log) => (
-                <li key={log._id || log.id}>
-                  <Link
-                    to={`/employee/logs/${log._id || log.id}`}
-                    className="flex items-start gap-4 px-8 py-6 transition-all hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-                  >
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-zinc-100 dark:bg-zinc-800 text-zinc-500 shadow-sm">
-                      <ListChecks className="h-6 w-6" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="truncate text-sm font-bold text-zinc-900 dark:text-white">{log.title}</p>
-                        <StatusBadge status={log.status} />
-                      </div>
-                      <p className="line-clamp-1 text-xs text-zinc-500 font-medium leading-relaxed">
-                        {log.tasks && log.tasks.length > 0 
-                          ? `${log.tasks.length} task${log.tasks.length !== 1 ? 's' : ''}`
-                          : 'No tasks'
-                        }
-                      </p>
-                    </div>
-                    <div className="shrink-0 flex flex-col items-end gap-1">
-                      <span className="text-[10px] font-bold text-zinc-400 uppercase">{new Date(log.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
-                      <div className="flex -space-x-1">
-                        {log.tasks && log.tasks.slice(0, 3).map((_, i) => (
-                          <div key={i} className="h-1.5 w-1.5 rounded-full bg-primary/40 ring-2 ring-white dark:ring-zinc-900" />
-                        ))}
-                      </div>
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
-        {/* RIGHT: Stats & Charts */}
-        <div className="lg:col-span-4 space-y-8">
-          
-          {/* Weekly Output Chart */}
-          <section className="bg-white dark:bg-zinc-950 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
-            <header className="border-b border-zinc-100 dark:border-zinc-800/50 px-8 py-6 bg-zinc-50/30">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-primary" />
-                <h2 className="text-sm font-bold uppercase tracking-wider">Weekly Velocity</h2>
-              </div>
-            </header>
-            <div className="p-8 pt-12 h-[260px] flex items-end justify-between gap-3">
-              {(() => {
-                const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-                const today = new Date();
-                const currentDay = today.getDay();
-                const diffToMonday = currentDay === 0 ? 6 : currentDay - 1;
-                const weekDays = Array.from({ length: 7 }, (_, i) => {
-                  const d = new Date(today);
-                  d.setDate(today.getDate() - diffToMonday + i);
-                  const dateStr = d.toDateString();
-                  const dayLabel = dayNames[d.getDay()].charAt(0);
-                  const count = myLogs.filter((l: any) => new Date(l.date).toDateString() === dateStr).length;
-                  return { day: dayLabel, val: count };
-                });
-                const maxVal = Math.max(...weekDays.map(d => d.val), 1);
-                return weekDays.map((d, i) => (
-                  <div key={i} className="flex flex-col items-center gap-2 flex-1 group relative">
-                    <div className="absolute -top-7 text-[9px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                      {d.val}
-                    </div>
-                    <div className="w-full bg-zinc-100 dark:bg-zinc-800/50 rounded-xl flex items-end justify-center h-32 relative overflow-hidden group-hover:bg-zinc-200 transition-colors">
-                      <div
-                        className="w-full bg-primary/60 rounded-xl transition-all duration-700 group-hover:bg-primary shadow-sm"
-                        style={{ height: `${Math.round((d.val / maxVal) * 100)}%` }}
-                      />
-                    </div>
-                    <span className="text-[10px] text-zinc-400 font-bold uppercase">{d.day}</span>
-                  </div>
-                ));
-              })()}
-            </div>
-          </section>
+        <div className="grid gap-8 lg:grid-cols-12">
+          {/* ACTIVE ASSIGNMENTS LIST */}
+          <Card className="lg:col-span-7 overflow-hidden border-none shadow-premium bg-background/50 backdrop-blur-xl">
+             <header className="flex items-center justify-between border-b border-border/50 px-8 py-6">
+                <div>
+                   <h3 className="text-sm font-black uppercase tracking-wider flex items-center gap-2">
+                      <Layers className="h-4 w-4 text-primary" /> Active Deployments
+                   </h3>
+                   <p className="text-[10px] text-muted-foreground font-bold uppercase mt-1">High priority assignments for you</p>
+                </div>
+                <Button asChild variant="ghost" size="sm" className="h-8 text-[10px] font-bold uppercase text-primary">
+                   <Link to="/employee/tasks">View Task Board</Link>
+                </Button>
+             </header>
+             <CardContent className="p-0">
+                <div className="divide-y divide-border/30">
+                   {assignedAssignments.length > 0 ? (
+                      assignedAssignments.map((a: any) => (
+                        <Link key={a._id} to="/employee/tasks" className="group flex items-center gap-6 px-8 py-6 transition-all hover:bg-accent/5">
+                           <div className="h-14 w-14 shrink-0 rounded-2xl bg-accent flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                              <FileText className="h-7 w-7 text-muted-foreground group-hover:text-primary transition-colors" />
+                           </div>
+                           <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between mb-2">
+                                 <h4 className="text-sm font-black uppercase tracking-wide truncate group-hover:text-primary transition-colors">{a.title}</h4>
+                                 <span className="text-[10px] font-black text-primary bg-primary/10 px-2 py-0.5 rounded-full">{Math.round(a.progress)}%</span>
+                              </div>
+                              <Progress value={a.progress} className="h-1.5 bg-accent/30" />
+                              <div className="flex items-center justify-between mt-3">
+                                 <span className="text-[10px] font-bold text-muted-foreground uppercase">From {a.assignedBy.name}</span>
+                                 <span className="text-[10px] font-bold text-muted-foreground uppercase">{new Date(a.createdAt).toLocaleDateString()}</span>
+                              </div>
+                           </div>
+                           <ChevronRight className="h-5 w-5 text-muted-foreground transition-all group-hover:translate-x-1" />
+                        </Link>
+                      ))
+                   ) : (
+                      <div className="py-20 text-center">
+                         <div className="h-16 w-16 bg-accent rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Layers className="h-8 w-8 text-muted-foreground opacity-20" />
+                         </div>
+                         <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">No active assignments</p>
+                      </div>
+                   )}
+                </div>
+             </CardContent>
+          </Card>
 
-          {/* Status Breakdown */}
-          <section className="bg-white dark:bg-zinc-950 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
-            <header className="border-b border-zinc-100 dark:border-zinc-800/50 px-8 py-6 bg-zinc-50/30">
-              <div className="flex items-center gap-2">
-                <PieChart className="h-4 w-4 text-primary" />
-                <h2 className="text-sm font-bold uppercase tracking-wider">Status Analysis</h2>
-              </div>
-            </header>
-            <div className="p-8 space-y-8">
-              <div className="flex h-3 w-full rounded-full overflow-hidden bg-zinc-100 dark:bg-zinc-800">
-                <div className="bg-success transition-all duration-1000" style={{ width: `${completedPerc}%` }} />
-                <div className="bg-info transition-all duration-1000" style={{ width: `${inProgressPerc}%` }} />
-                <div className="bg-primary/20 transition-all duration-1000" style={{ width: `${pendingPerc}%` }} />
-              </div>
-              
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="h-2.5 w-2.5 rounded-full bg-success shadow-lg shadow-success/30"></div>
-                    <span className="text-xs font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-tighter">Completed</span>
-                  </div>
-                  <span className="text-xs font-bold text-zinc-900 dark:text-white">{completedPerc}%</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="h-2.5 w-2.5 rounded-full bg-info shadow-lg shadow-info/30"></div>
-                    <span className="text-xs font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-tighter">In Progress</span>
-                  </div>
-                  <span className="text-xs font-bold text-zinc-900 dark:text-white">{inProgressPerc}%</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="h-2.5 w-2.5 rounded-full bg-primary/20 shadow-lg shadow-primary/10"></div>
-                    <span className="text-xs font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-tighter">Pending</span>
-                  </div>
-                  <span className="text-xs font-bold text-zinc-900 dark:text-white">{pendingPerc}%</span>
-                </div>
-              </div>
-            </div>
-          </section>
+          {/* VELOCITY CHART */}
+          <div className="lg:col-span-5 space-y-8">
+             <Card className="border-none shadow-premium bg-gradient-to-br from-primary/5 to-transparent">
+                <header className="px-8 py-6 border-b border-border/50">
+                   <h3 className="text-sm font-black uppercase tracking-wider flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-primary" /> My Output Velocity
+                   </h3>
+                </header>
+                <CardContent className="p-8">
+                   <div className="h-[250px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                         <AreaChart data={velocityData}>
+                            <defs>
+                               <linearGradient id="velocityGradient" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                               </linearGradient>
+                            </defs>
+                            <XAxis dataKey="name" hide />
+                            <YAxis hide />
+                            <Tooltip 
+                              contentStyle={{ 
+                                 borderRadius: '12px', 
+                                 border: 'none', 
+                                 backgroundColor: 'hsl(var(--card))',
+                                 boxShadow: 'var(--shadow-xl)'
+                              }} 
+                            />
+                            <Area 
+                              type="monotone" 
+                              dataKey="val" 
+                              stroke="hsl(var(--primary))" 
+                              strokeWidth={4} 
+                              fill="url(#velocityGradient)" 
+                            />
+                         </AreaChart>
+                      </ResponsiveContainer>
+                   </div>
+                   <div className="mt-6 p-4 rounded-2xl bg-white/50 backdrop-blur-sm border border-white/50 shadow-inner text-center">
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Personal Performance Rating</p>
+                      <p className="text-xl font-black mt-1">Excellent Architecture</p>
+                   </div>
+                </CardContent>
+             </Card>
+
+             <div className="grid grid-cols-2 gap-4">
+                <Link to="/employee/profile" className="group p-5 rounded-3xl bg-background shadow-premium border-none transition-all hover:bg-primary hover:-translate-y-1">
+                   <div className="h-10 w-10 rounded-xl bg-accent flex items-center justify-center mb-3 transition-colors group-hover:bg-white/20">
+                      <Layers className="h-5 w-5 text-muted-foreground group-hover:text-white" />
+                   </div>
+                   <h4 className="text-xs font-black uppercase tracking-wider group-hover:text-white">Profile</h4>
+                   <p className="text-[10px] text-muted-foreground font-bold mt-1 group-hover:text-white/70">Personal settings</p>
+                </Link>
+                <Link to="/employee/messages" className="group p-5 rounded-3xl bg-background shadow-premium border-none transition-all hover:bg-success hover:-translate-y-1">
+                   <div className="h-10 w-10 rounded-xl bg-accent flex items-center justify-center mb-3 transition-colors group-hover:bg-white/20">
+                      <Zap className="h-5 w-5 text-muted-foreground group-hover:text-white" />
+                   </div>
+                   <h4 className="text-xs font-black uppercase tracking-wider group-hover:text-white">Messages</h4>
+                   <p className="text-[10px] text-muted-foreground font-bold mt-1 group-hover:text-white/70">Team interaction</p>
+                </Link>
+             </div>
+          </div>
         </div>
       </div>
     </AppShell>

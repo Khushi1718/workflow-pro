@@ -93,7 +93,7 @@ export default function MessagingView() {
     }
   };
 
-  const role = currentUser?.role === 'admin' ? 'admin' : 'employee';
+  const role = currentUser?.role === 'master_admin' ? 'master_admin' : currentUser?.role === 'admin' ? 'admin' : 'employee';
 
   return (
     <AppShell role={role} title="Communications" subtitle="Direct 1-to-1 secure messaging.">

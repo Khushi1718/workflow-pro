@@ -1,0 +1,41 @@
+import mongoose, { Document, Model, Schema } from "mongoose";
+
+export interface IAssignment extends Document {
+  assignedBy: mongoose.Types.ObjectId;
+  assignedTo: mongoose.Types.ObjectId;
+  title: string; // e.g. "Weekly SEO Sprint"
+  status: "pending" | "in_progress" | "completed";
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const assignmentSchema = new Schema<IAssignment>(
+  {
+    assignedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    assignedTo: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    title: {
+      type: String,
+      required: true,
+    },
+    status: {
+      type: String,
+      enum: ["pending", "in_progress", "completed"],
+      default: "pending",
+    },
+  },
+  { timestamps: true }
+);
+
+if (mongoose.models.Assignment) {
+  delete (mongoose.models as any).Assignment;
+}
+const Assignment: Model<IAssignment> = mongoose.model<IAssignment>("Assignment", assignmentSchema);
+export default Assignment;
