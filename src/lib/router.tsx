@@ -1,7 +1,7 @@
 "use client";
 
 import NextLink from "next/link";
-import { useParams as useNextParams, usePathname, useRouter } from "next/navigation";
+import { useParams as useNextParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnchorHTMLAttributes, forwardRef, useCallback } from "react";
 
 type LinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href" | "className"> & {
@@ -47,7 +47,9 @@ export function useNavigate() {
 
 export function useLocation() {
   const pathname = usePathname();
-  return { pathname, state: undefined as any };
+  const searchParams = useSearchParams();
+  const search = searchParams?.toString() ? `?${searchParams.toString()}` : "";
+  return { pathname, search, state: undefined as any };
 }
 
 export function useParams() {
