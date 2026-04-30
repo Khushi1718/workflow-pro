@@ -23,7 +23,8 @@ import {
   Activity,
   ArrowUpRight,
   User,
-  MessageSquare
+  MessageSquare,
+  Layout
  } from "lucide-react";
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 import { toast } from "sonner";
