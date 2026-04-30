@@ -1067,8 +1067,7 @@ export async function GET(request: NextRequest, context: Context) {
         $project: {
           "assignedBy.password": 0,
           "assignedTo.password": 0,
-          assignedToInfo: 0,
-          tasks: 0 
+          assignedToInfo: 0
         }
       },
       { $sort: { createdAt: -1 } }
@@ -1488,13 +1487,10 @@ export async function PUT(request: NextRequest, context: Context) {
     const task = await Task.findById(taskId);
     if (!task) return fail(404, "Task not found");
 
-    // Only assignee can track time
-    if (auth.user.role === "employee") {
-      // Find the assignment to check assignee
-      const assignment = await Assignment.findById(task.assignmentId);
-      if (assignment?.assignedTo.toString() !== auth.user.userId) {
-        return fail(403, "Not authorized to track time for this task");
-      }
+    // Only the actual assignee can track time
+    const assignment = await Assignment.findById(task.assignmentId);
+    if (assignment?.assignedTo.toString() !== auth.user.userId) {
+      return fail(403, "Only the assigned personnel can track time for this task.");
     }
 
     const { action } = body; // "start" or "stop"
@@ -1507,7 +1503,7 @@ export async function PUT(request: NextRequest, context: Context) {
       if (!task.timerStartedAt) return fail(400, "Timer not running");
       const now = new Date();
       const diff = Math.floor((now.getTime() - task.timerStartedAt.getTime()) / 1000);
-      task.timeSpent += diff;
+      task.timeSpent += Number(task.timeSpent || 0) + diff;
       task.timerStartedAt = undefined;
     }
 

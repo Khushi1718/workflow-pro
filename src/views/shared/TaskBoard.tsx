@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "@/lib/router";
 import { AppShell } from "@/components/AppShell";
 import { tasks, auth as authApi, admin, apiRequest } from "@/lib/api";
 import { 
@@ -24,7 +25,9 @@ import {
   Link,
   ExternalLink,
   File,
-  Users
+  Users,
+  ShieldCheck,
+  ArrowUpRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +47,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import { AssignmentDetails } from "@/components/AssignmentDetails";
 
 export default function TaskBoard({ 
   role, 
@@ -58,11 +62,10 @@ export default function TaskBoard({
   subtitle?: string,
   hideTabs?: boolean
 }) {
+  const location = useLocation();
   const [activeTasks, setActiveTasks] = useState<any[]>([]);
   const [type, setType] = useState<"assigned_to_me" | "assigned_by_me" | "all">(
-    initialDate 
-      ? (role === "employee" ? "assigned_to_me" : "all") 
-      : (role === "employee" ? "assigned_to_me" : "assigned_by_me")
+    (role === "employee" ? "assigned_to_me" : "assigned_by_me")
   );
   const [filterDate, setFilterDate] = useState<string>(initialDate || "");
   const [filterDepartment, setFilterDepartment] = useState<string>("all");
@@ -83,7 +86,6 @@ export default function TaskBoard({
   
   // View State
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
-  const [assignmentTasks, setAssignmentTasks] = useState<any[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [evidenceData, setEvidenceData] = useState({
     completionRemarks: "",
@@ -94,10 +96,44 @@ export default function TaskBoard({
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
+  // Initialize filters based on URL
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const aid = params.get('assignmentId');
+    if (aid) {
+      setType("all");
+      setFilterDate("");
+    } else if (initialDate) {
+      setFilterDate(initialDate);
+      if (role !== "employee") setType("all");
+    }
+  }, [location.search, initialDate, role]);
+
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchTerm), 500);
     return () => clearTimeout(timer);
   }, [searchTerm]);
+
+  // Handle deep linking to an assignment
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const assignmentId = params.get('assignmentId');
+    
+    if (assignmentId && activeTasks.length > 0) {
+      const assignment = activeTasks.find(a => (a._id || a.id) === assignmentId);
+      if (assignment) {
+        // Only set if not already selected to avoid infinite loop
+        if (!selectedAssignment || (selectedAssignment._id || selectedAssignment.id) !== assignmentId) {
+          setSelectedAssignment(assignment);
+          setIsTasksModalOpen(true);
+        }
+      } else if (type !== "all" || filterDate !== "") {
+        // If not found, try clearing filters to find it
+        setType("all");
+        setFilterDate("");
+      }
+    }
+  }, [location.search, activeTasks, type, filterDate, selectedAssignment]);
 
   const fetchTasks = async () => {
     try {
@@ -110,7 +146,15 @@ export default function TaskBoard({
         filterDepartment === "all" ? undefined : filterDepartment
       );
       if (res.success) {
-        setActiveTasks(res.data || []);
+        // Normalize "Development" to "Tech" in real-time
+        const normalized = (res.data || []).map((assignment: any) => ({
+          ...assignment,
+          assignedTo: {
+            ...assignment.assignedTo,
+            team: assignment.assignedTo?.team === "Development" ? "Tech" : assignment.assignedTo?.team
+          }
+        }));
+        setActiveTasks(normalized);
       }
     } catch (error) {
       console.error("GET /tasks error:", error);
@@ -118,16 +162,17 @@ export default function TaskBoard({
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const fetchAssignmentTasks = async (assignmentId: string) => {
+  };  const fetchAssignmentTasks = async (assignmentId: string) => {
     try {
       const res = await tasks.getAssignmentTasks(assignmentId);
       if (res.success) {
-        setAssignmentTasks(res.data || []);
+        setSelectedAssignment((prev: any) => ({
+          ...prev,
+          tasks: res.data
+        }));
       }
     } catch (error) {
-      toast.error("Failed to load tasks");
+      console.error("GET /assignments/:id/tasks error:", error);
     }
   };
 
@@ -146,8 +191,11 @@ export default function TaskBoard({
         const profile = profileRes.data;
         let allUsers = usersRes.data || [];
         
-        // Filter out the current user themselves
-        let filtered = allUsers.filter((u: any) => (u.id || u._id) !== (profile.id || profile._id));
+        // Normalize "Development" to "Tech" in real-time
+        let filtered = allUsers.map((u: any) => ({
+          ...u,
+          team: u.team === "Development" ? "Tech" : u.team
+        })).filter((u: any) => (u.id || u._id) !== (profile.id || profile._id));
         
         if (role === "admin") {
           // Admins can only assign to Employees
@@ -220,7 +268,7 @@ export default function TaskBoard({
     try {
       const res = await tasks.toggleTimer(taskId, currentAction);
       if (res.success) {
-        fetchAssignmentTasks(selectedAssignment._id);
+
         toast.success(`Timer ${currentAction}ed`);
       }
     } catch (error: any) {
@@ -244,7 +292,7 @@ export default function TaskBoard({
         toast.success("Task completed successfully");
         setIsEvidenceModalOpen(false);
         setEvidenceData({ completionRemarks: "", evidence: "", evidenceFiles: [] });
-        fetchAssignmentTasks(selectedAssignment._id);
+
         fetchTasks(); // Refresh assignment progress
       }
     } catch (error: any) {
@@ -432,138 +480,13 @@ export default function TaskBoard({
           </DialogContent>
         </Dialog>
 
-        {/* Assignment Tasks Modal */}
-        <Dialog open={isTasksModalOpen} onOpenChange={setIsTasksModalOpen}>
-          <DialogContent className="sm:max-w-[800px] max-h-[85vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl">
-            <DialogHeader className="p-6 pb-4 border-b border-border/50">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary border border-primary/20">
-                    <ClipboardList className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <DialogTitle className="text-xl font-bold">{selectedAssignment?.title}</DialogTitle>
-                    <DialogDescription>
-                      Assigned to {selectedAssignment?.assignedTo?.name} • {assignmentTasks.length} Tasks
-                    </DialogDescription>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Overall Progress</div>
-                  <div className="flex items-center gap-3">
-                    <Progress value={selectedAssignment?.progress} className="h-2 w-32 bg-accent/50" />
-                    <span className="text-sm font-bold">{Math.round(selectedAssignment?.progress || 0)}%</span>
-                  </div>
-                </div>
-              </div>
-            </DialogHeader>
-            
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-accent/5">
-              {assignmentTasks.map((task) => (
-                <div key={task._id} className={cn(
-                  "p-5 rounded-2xl bg-background border border-border/50 shadow-sm transition-all hover:shadow-md",
-                  task.status === 'completed' && "opacity-75"
-                )}>
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-bold text-base">{task.title}</h4>
-                        <Badge variant="outline" className={cn("text-[9px] uppercase font-bold", getPriorityColor(task.priority))}>
-                          {task.priority}
-                        </Badge>
-                        <Badge variant="secondary" className="text-[9px] uppercase font-bold">
-                          {task.status.replace('_', ' ')}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground leading-relaxed">{task.description}</p>
-                      
-                      {task.status === 'completed' && (task.completionRemarks || task.evidence || (task.evidenceFiles && task.evidenceFiles.length > 0)) && (
-                        <div className="mt-3 p-3 rounded-xl bg-accent/5 border border-border/50 space-y-2">
-                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Completion Evidence</p>
-                          {task.completionRemarks && (
-                            <div className="space-y-1">
-                              <p className="text-[10px] font-bold text-muted-foreground/70 uppercase">Remarks</p>
-                              <p className="text-xs italic text-foreground/80">"{task.completionRemarks}"</p>
-                            </div>
-                          )}
-                          {task.evidence && (
-                            <div className="space-y-1">
-                              <p className="text-[10px] font-bold text-muted-foreground/70 uppercase">Link</p>
-                              <a href={task.evidence} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-primary hover:underline font-medium">
-                                <Link className="h-3 w-3" /> View Evidence Link <ExternalLink className="h-2.5 w-2.5" />
-                              </a>
-                            </div>
-                          )}
-                          {task.evidenceFiles && task.evidenceFiles.length > 0 && (
-                            <div className="space-y-1">
-                              <p className="text-[10px] font-bold text-muted-foreground/70 uppercase">Attachments</p>
-                              <div className="flex flex-wrap gap-2">
-                                {task.evidenceFiles.map((file: any, i: number) => (
-                                  <a 
-                                    key={i} 
-                                    href={file.url} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-1.5 text-[10px] bg-background hover:bg-accent/10 px-2 py-1 rounded-md border border-border/50 text-muted-foreground transition-colors"
-                                  >
-                                    <FileText className="h-3 w-3" /> {file.name}
-                                  </a>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          {task.completedAt && (
-                            <div className="pt-1 flex items-center gap-1.5 text-[9px] text-muted-foreground">
-                              <Clock className="h-2.5 w-2.5" /> Submitted on {new Date(task.completedAt).toLocaleString()}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end gap-2 shrink-0">
-                      <div className="flex items-center gap-1.5 text-muted-foreground bg-accent px-2 py-1 rounded-md text-[10px] font-bold">
-                        <Clock className="h-3 w-3" />
-                        {formatTime(task.timeSpent || 0)}
-                      </div>
-                      {task.status === 'completed' ? (
-                        <div className="flex items-center gap-1 text-success font-bold text-[10px] uppercase bg-success/10 px-2 py-1 rounded-md">
-                          <CheckCircle2 className="h-3 w-3" /> Done
-                        </div>
-                      ) : (
-                        (() => {
-                          const currentUserId = currentUser?.id || currentUser?._id;
-                          const assigneeId = selectedAssignment?.assignedTo?._id || selectedAssignment?.assignedTo;
-                          const isAssignee = currentUserId && assigneeId && (currentUserId === assigneeId);
-                          
-                          return isAssignee && (
-                            <div className="flex items-center gap-2">
-                              {task.timerStartedAt ? (
-                                <Button size="sm" variant="outline" className="h-8 text-[10px] gap-1 border-destructive/20 text-destructive hover:bg-destructive/10" onClick={() => handleToggleTimer(task._id, 'stop')}>
-                                  <StopCircle className="h-3.5 w-3.5" /> Stop Timer
-                                </Button>
-                              ) : (
-                                <Button size="sm" variant="outline" className="h-8 text-[10px] gap-1 border-primary/20 text-primary hover:bg-primary/10" onClick={() => handleToggleTimer(task._id, 'start')}>
-                                  <PlayCircle className="h-3.5 w-3.5" /> Start Timer
-                                </Button>
-                              )}
-                              <Button 
-                                size="sm" 
-                                className="h-8 text-[10px] gap-1 bg-success hover:bg-success/90 text-white"
-                                onClick={() => { setSelectedTask(task); setIsEvidenceModalOpen(true); }}
-                              >
-                                <CheckCircle2 className="h-3.5 w-3.5" /> Complete
-                              </Button>
-                            </div>
-                          );
-                        })()
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </DialogContent>
-        </Dialog>
+        <AssignmentDetails 
+          isOpen={isTasksModalOpen}
+          onClose={() => setIsTasksModalOpen(false)}
+          assignment={selectedAssignment}
+          currentUser={currentUser}
+          onTaskUpdate={fetchTasks}
+        />
 
         {/* Evidence Submission Modal */}
         <Dialog open={isEvidenceModalOpen} onOpenChange={setIsEvidenceModalOpen}>
@@ -720,9 +643,10 @@ export default function TaskBoard({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Depts</SelectItem>
-                      <SelectItem value="SEO">SEO</SelectItem>
-                      <SelectItem value="Management">Management</SelectItem>
+                      <SelectItem value="Design">Design</SelectItem>
                       <SelectItem value="Tech">Tech</SelectItem>
+                      <SelectItem value="Management">Management</SelectItem>
+                      <SelectItem value="SEO">SEO</SelectItem>
                       <SelectItem value="Sales">Sales</SelectItem>
                     </SelectContent>
                   </Select>

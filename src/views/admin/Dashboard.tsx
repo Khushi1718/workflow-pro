@@ -3,7 +3,7 @@ import { Link } from "@/lib/router";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { admin, auth, tasks } from "@/lib/api";
-import { getGreeting, cn } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { 
   ArrowRight, 
   CheckCircle2, 
@@ -11,288 +11,323 @@ import {
   Users, 
   Loader2, 
   ClipboardList, 
-  TrendingUp, 
-  Zap, 
   Activity,
-  Calendar,
-  Layers,
-  ChevronRight,
   Plus,
   AlertTriangle,
+  ArrowUpRight,
+  ShieldCheck,
+  UserCheck,
   Target,
-  BarChart3
+  FileText,
+  TrendingUp,
+  Zap,
+  BarChart3,
+  Monitor,
+  Layout,
+  Briefcase
 } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from "recharts";
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from "recharts";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { motion } from "framer-motion";
 
 export default function AdminDashboard() {
-  const [currentAdmin, setCurrentAdmin] = useState<any>(null);
-  const [taskStats, setTaskStats] = useState({
-    total: 0,
-    completed: 0,
-    inProgress: 0,
-    activeBundles: 0,
-    completionRate: 0,
-    overdue: 0
-  });
-  const [recentAssignments, setRecentAssignments] = useState<any[]>([]);
-  const [chartData, setChartData] = useState<any[]>([]);
-  const [teamPerformance, setTeamPerformance] = useState<any[]>([]);
+  const [user, setUser] = useState<any>(null);
+  const [allTasks, setAllTasks] = useState<any[]>([]);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [graphRange, setGraphRange] = useState<"this" | "last">("this");
+
+  const [stats, setStats] = useState({
+    totalTasks: 0,
+    activeTasks: 0,
+    completedTasks: 0,
+    todayCompleted: 0,
+    todayPending: 0,
+    overdueTasks: 0,
+    teamSize: 0,
+    teamActive: 0
+  });
+
+  const [weeklyData, setWeeklyData] = useState<any[]>([]);
+  const [memberPerformance, setMemberPerformance] = useState<any[]>([]);
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
+    const fetchData = async () => {
       try {
         setIsLoading(true);
-        const [profileRes, assignedRes] = await Promise.all([
+        const [profileRes, tasksRes, usersRes] = await Promise.all([
           auth.getProfile(),
-          tasks.getAll("assigned_by_me")
+          tasks.getAll("all"),
+          admin.getAllUsers()
         ]);
 
-        if (profileRes.success) setCurrentAdmin(profileRes.data);
-
-        const allAssigned = assignedRes.data || [];
-        const total = allAssigned.length;
-        const completed = allAssigned.filter((a: any) => a.progress === 100).length;
-        const active = allAssigned.filter((a: any) => a.progress > 0 && a.progress < 100).length;
+        if (profileRes.success) setUser(profileRes.data);
         
-        // Mock overdue: assignments with < 100% progress and passed deadline
-        const now = new Date();
-        const overdue = allAssigned.filter((a: any) => a.progress < 100 && new Date(a.deadline || a.createdAt) < now).length;
+        const myProfile = profileRes.data;
+        const tasksData = tasksRes.data || [];
+        const usersData = usersRes.data || [];
 
-        setTaskStats({
-          total,
-          completed,
-          inProgress: active,
-          activeBundles: allAssigned.filter((a: any) => a.progress < 100).length,
-          completionRate: total > 0 ? Math.round((completed / total) * 100) : 0,
-          overdue
+        // Filter tasks: assigned to me OR assigned by me
+        const filteredTasks = tasksData.filter((t: any) => 
+          (t.assignedTo?._id === myProfile._id || t.assignedTo === myProfile._id) ||
+          (t.assignedBy?._id === myProfile._id || t.assignedBy === myProfile._id)
+        );
+        
+        setAllTasks(filteredTasks);
+
+        // Filter users: part of my team? 
+        // For simplicity in this layout, we show all employees if team is not strictly defined, 
+        // but here we filter by the admin's team if available.
+        const myTeamMembers = usersData.filter((u: any) => 
+          u.role === "employee" && (myProfile.team ? u.team === myProfile.team : true)
+        );
+        setTeamMembers(myTeamMembers);
+
+        const now = new Date();
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+
+        setStats({
+          totalTasks: filteredTasks.length,
+          activeTasks: filteredTasks.filter((t: any) => t.status === "in_progress").length,
+          completedTasks: filteredTasks.filter((t: any) => t.status === "completed").length,
+          todayCompleted: filteredTasks.filter((t: any) => t.status === "completed" && t.completedAt && new Date(t.completedAt) >= startOfToday).length,
+          todayPending: filteredTasks.filter((t: any) => t.status !== "completed" && new Date(t.createdAt) >= startOfToday).length,
+          overdueTasks: filteredTasks.filter((t: any) => t.status !== "completed" && new Date(t.deadline) < now).length,
+          teamSize: myTeamMembers.length,
+          teamActive: myTeamMembers.filter((u: any) => u.isActive).length
         });
 
-        setRecentAssignments(allAssigned.slice(0, 5));
-
-        // Mock chart data
-        const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-        setChartData(dayNames.map(day => ({
-          name: day,
-          count: Math.floor(Math.random() * 20) + 10,
-          completed: Math.floor(Math.random() * 15) + 5
-        })));
-
-        // Team Performance Breakdown
-        const depts = ["SEO", "Tech", "Sales", "Mgmt"];
-        setTeamPerformance(depts.map(d => ({
-          name: d,
-          value: Math.floor(Math.random() * 40) + 60,
-          tasks: Math.floor(Math.random() * 15) + 5
-        })));
+        // Member Performance (Top 5)
+        const perf = myTeamMembers.map((mem: any) => {
+          const memTasks = tasksData.filter((t: any) => t.assignedTo?._id === mem._id || t.assignedTo === mem._id);
+          const completed = memTasks.filter((t: any) => t.status === "completed").length;
+          return {
+            id: mem._id,
+            name: mem.name,
+            team: mem.team,
+            assigned: memTasks.length,
+            completed: completed,
+            progress: memTasks.length > 0 ? Math.round((completed / memTasks.length) * 100) : 0
+          };
+        }).sort((a, b) => b.assigned - a.assigned).slice(0, 5);
+        setMemberPerformance(perf);
 
       } catch (error) {
-        console.error("Dashboard data fetch error:", error);
-        toast.error("Failed to synchronize dashboard");
+        toast.error("Dashboard sync failed");
       } finally {
         setIsLoading(false);
       }
     };
-
-    fetchDashboardData();
+    fetchData();
   }, []);
+
+  useEffect(() => {
+    if (allTasks.length === 0) return;
+
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const data = days.map((day, index) => {
+      const d = new Date();
+      const currentDay = d.getDay();
+      const diff = index + 1 - (currentDay === 0 ? 7 : currentDay);
+      
+      const targetDate = new Date();
+      targetDate.setDate(targetDate.getDate() + diff + (graphRange === "last" ? -7 : 0));
+      const dateStr = targetDate.toISOString().split('T')[0];
+
+      return {
+        name: day,
+        assigned: allTasks.filter((t: any) => t.createdAt.startsWith(dateStr)).length,
+        completed: allTasks.filter((t: any) => t.completedAt && t.completedAt.startsWith(dateStr)).length
+      };
+    });
+    setWeeklyData(data);
+  }, [allTasks, graphRange]);
 
   if (isLoading) {
     return (
-      <AppShell role="admin" title="Dashboard" subtitle="Synchronizing workspace data...">
-        <div className="flex h-[60vh] flex-col items-center justify-center gap-4">
-          <div className="relative">
-            <div className="h-16 w-16 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
-            <Layers className="absolute left-1/2 top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 text-primary" />
-          </div>
-          <p className="text-sm font-medium text-muted-foreground animate-pulse tracking-widest uppercase">Initializing Core Insights...</p>
-        </div>
-      </AppShell>
+      <div className="flex h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+        <Loader2 className="h-6 w-6 animate-spin text-zinc-400" />
+      </div>
     );
   }
 
-  const firstName = currentAdmin?.name?.split(" ").pop() || "Admin";
-  const basePath = currentAdmin?.role === "master_admin" ? "/master-admin" : "/admin";
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { staggerChildren: 0.05 } }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 15 },
+    visible: { opacity: 1, y: 0 }
+  };
 
   return (
-    <AppShell 
-      role={currentAdmin?.role || "admin"} 
-      title={`${getGreeting()}, ${firstName}`} 
-      subtitle="Operational command center for team-wide assignment velocity."
-      actions={
-        <div className="flex items-center gap-3">
-          <Button asChild variant="outline" className="h-10 rounded-xl border-border/50 bg-background/50 backdrop-blur-md hover:bg-accent/50 transition-all">
-            <Link to={`${basePath}/tasks`}>View Board</Link>
-          </Button>
-          <Button asChild className="h-10 rounded-xl bg-primary text-white shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all hover:scale-[1.02] active:scale-95">
-            <Link to={`${basePath}/tasks`}><Plus className="mr-2 h-4 w-4" /> Create Assignment</Link>
-          </Button>
-        </div>
-      }
-    >
-      <div className="space-y-8 pb-12 animate-in fade-in duration-700">
-        
-        {/* STATS BENTO GRID */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {[
-            { label: "Active Deployments", value: taskStats.activeBundles, icon: Layers, color: "text-blue-500", bg: "bg-blue-500/10", glow: "group-hover:shadow-blue-500/20" },
-            { label: "Success Rate", value: `${taskStats.completionRate}%`, icon: Zap, color: "text-amber-500", bg: "bg-amber-500/10", glow: "group-hover:shadow-amber-500/20" },
-            { label: "Completed Milestones", value: taskStats.completed, icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10", glow: "group-hover:shadow-emerald-500/20" },
-            { label: "Critical Items", value: taskStats.overdue, icon: AlertTriangle, color: "text-rose-500", bg: "bg-rose-500/10", glow: "group-hover:shadow-rose-500/20" },
-          ].map((stat, i) => (
-            <Card key={i} className={cn("group relative overflow-hidden border-none shadow-premium transition-all hover:shadow-2xl hover:-translate-y-1", stat.glow)}>
-              <div className={cn("absolute right-0 top-0 h-24 w-24 -translate-y-8 translate-x-8 rounded-full opacity-10 blur-3xl transition-transform group-hover:scale-150", stat.bg)} />
-              <CardContent className="p-7">
-                <div className="flex items-center justify-between">
-                  <div className={cn("rounded-2xl p-3.5 transition-all group-hover:rotate-6", stat.bg)}>
-                    <stat.icon className={cn("h-6 w-6", stat.color)} />
-                  </div>
-                  <div className="flex flex-col items-end">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{stat.label}</p>
-                    <h3 className="text-3xl font-black tracking-tighter mt-1">{stat.value}</h3>
-                  </div>
+    <AppShell role="admin" title="Operations Control">
+      <motion.div 
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="max-w-[1500px] mx-auto px-8 py-10 space-y-8 pb-20"
+      >
+        {/* HEADER */}
+        <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-zinc-100 dark:border-zinc-900 pb-10">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-zinc-50">
+              Operations Control
+            </h1>
+            <p className="text-[11px] font-black text-zinc-400 uppercase tracking-[0.4em]">Administrator: {user?.name} • Team: {user?.team || "Global Operations"}</p>
+          </div>
+          <div className="flex items-center gap-3">
+             <Button asChild variant="outline" className="h-10 rounded-xl text-[10px] font-bold uppercase tracking-widest border-zinc-200 shadow-sm hover:bg-zinc-50 transition-all">
+                <Link to="/admin/today">Live Activity</Link>
+             </Button>
+             <Button asChild className="h-10 rounded-xl bg-zinc-950 text-white text-[10px] font-bold uppercase tracking-widest px-6 shadow-xl hover:bg-zinc-800 transition-all">
+                <Link to="/admin/tasks"><Plus className="mr-2 h-4 w-4" /> Delegate Task</Link>
+             </Button>
+          </div>
+        </header>
+
+        {/* KPI OVERVIEW */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+           {[
+             { label: "My Pipeline", value: stats.totalTasks, sub: "Assigned & Managed", icon: Briefcase, color: "text-zinc-900" },
+             { label: "Execution Today", value: stats.todayCompleted, sub: "Tasks Finalized", icon: CheckCircle2, color: "text-emerald-500" },
+             { label: "Resource Node", value: stats.teamActive, sub: "Active Team Members", icon: UserCheck, color: "text-blue-500" },
+             { label: "Priority Alerts", value: stats.overdueTasks, sub: "Overdue Items", icon: AlertTriangle, color: "text-rose-500" }
+           ].map((s, i) => (
+             <motion.div key={i} variants={itemVariants} className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 p-6 rounded-3xl shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                   <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{s.label}</p>
+                   <s.icon className={cn("h-4 w-4", s.color)} />
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+                <h3 className="text-3xl font-black tracking-tight text-zinc-900 dark:text-zinc-50">{s.value}</h3>
+                <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-tighter mt-1">{s.sub}</p>
+             </motion.div>
+           ))}
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-12">
-          {/* VELOCITY ANALYSIS */}
-          <Card className="lg:col-span-8 border-none shadow-premium bg-background/50 backdrop-blur-xl overflow-hidden group">
-            <header className="flex items-center justify-between px-10 py-8 border-b border-border/40">
-              <div>
-                <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-3">
-                  <Activity className="h-5 w-5 text-primary animate-pulse" /> Operational Velocity
-                </h3>
-                <p className="text-[10px] text-muted-foreground font-bold uppercase mt-1.5">Assignment volume vs completion over time</p>
-              </div>
-              <div className="flex items-center gap-1 bg-accent/50 p-1.5 rounded-2xl border border-border/40 shadow-inner">
-                <Button variant="ghost" size="sm" className="h-8 rounded-xl text-[10px] font-black uppercase tracking-wider px-4">Daily</Button>
-                <Button variant="secondary" size="sm" className="h-8 rounded-xl text-[10px] font-black uppercase tracking-wider px-4 shadow-sm">Weekly</Button>
-              </div>
-            </header>
-            <CardContent className="p-10">
-              <div className="h-[380px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="velocityFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.2} />
-                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.3} />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 800, fill: 'hsl(var(--muted-foreground))' }} dy={15} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 800, fill: 'hsl(var(--muted-foreground))' }} />
-                    <Tooltip 
-                      contentStyle={{ borderRadius: '24px', border: 'none', backgroundColor: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(10px)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.15)' }}
-                      itemStyle={{ fontSize: '12px', fontWeight: 900 }}
-                    />
-                    <Area type="monotone" dataKey="count" name="Deployed" stroke="hsl(var(--primary))" strokeWidth={5} fill="url(#velocityFill)" />
-                    <Area type="monotone" dataKey="completed" name="Completed" stroke="hsl(var(--success))" strokeWidth={5} fill="transparent" strokeDasharray="10 5" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* TEAM BREAKDOWN */}
-          <Card className="lg:col-span-4 border-none shadow-premium flex flex-col bg-zinc-900 text-white overflow-hidden">
-            <header className="px-10 py-8 border-b border-white/10">
-              <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-3">
-                <Target className="h-5 w-5 text-primary" /> Team Health
-              </h3>
-              <p className="text-[10px] text-white/40 font-bold uppercase mt-1.5">Efficiency rating per department</p>
-            </header>
-            <CardContent className="p-8 space-y-8 flex-1">
-              {teamPerformance.map((team, i) => (
-                <div key={i} className="space-y-3 group/team cursor-default">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-xl bg-white/5 flex items-center justify-center text-[10px] font-black group-hover/team:bg-primary/20 transition-colors">
-                        {team.name[0]}
-                      </div>
-                      <span className="text-xs font-black uppercase tracking-widest">{team.name}</span>
+        <div className="grid lg:grid-cols-12 gap-8">
+           
+           <div className="lg:col-span-8 space-y-8">
+              {/* WEEKLY TREND */}
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-[32px] p-8 shadow-sm">
+                 <div className="flex items-center justify-between mb-8">
+                    <div>
+                      <h2 className="text-[11px] font-black text-zinc-900 dark:text-zinc-50 uppercase tracking-[0.3em]">Operational Weekly Trend</h2>
+                      <p className="text-[9px] text-zinc-400 mt-1 uppercase font-bold tracking-widest">Delegated vs Completed</p>
                     </div>
-                    <span className="text-xs font-black text-primary">{team.value}%</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-primary transition-all duration-1000 group-hover/team:brightness-125" 
-                      style={{ width: `${team.value}%` }} 
-                    />
-                  </div>
-                  <div className="flex justify-between text-[9px] font-black uppercase text-white/30 tracking-tighter">
-                    <span>{team.tasks} Active Tasks</span>
-                    <span>Peak Velocity</span>
-                  </div>
-                </div>
-              ))}
-
-              <div className="mt-4 pt-4 border-t border-white/5">
-                 <Button asChild variant="ghost" className="w-full h-11 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] text-white/60 hover:text-white hover:bg-white/5">
-                   <Link to={`${basePath}/logs`}>Full Operational Report <ChevronRight className="ml-2 h-4 w-4" /></Link>
-                 </Button>
+                    <div className="flex bg-zinc-50 dark:bg-zinc-800 p-1 rounded-xl">
+                      <button 
+                        onClick={() => setGraphRange("this")}
+                        className={cn("px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all", graphRange === "this" ? "bg-white text-zinc-950 shadow-sm" : "text-zinc-400 hover:text-zinc-600")}
+                      >
+                        Current
+                      </button>
+                      <button 
+                        onClick={() => setGraphRange("last")}
+                        className={cn("px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all", graphRange === "last" ? "bg-white text-zinc-950 shadow-sm" : "text-zinc-400 hover:text-zinc-600")}
+                      >
+                        Previous
+                      </button>
+                    </div>
+                 </div>
+                 <div className="h-[280px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={weeklyData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f1f1" />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#a1a1aa' }} dy={10} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#a1a1aa' }} />
+                        <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.05)', fontSize: '11px', fontWeight: 800 }} />
+                        <Line type="monotone" dataKey="assigned" name="Assigned" stroke="#18181b" strokeWidth={3} dot={{ r: 4, fill: '#18181b', strokeWidth: 2, stroke: '#fff' }} />
+                        <Line type="monotone" dataKey="completed" name="Completed" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
 
-        {/* RECENT LIVE FEED */}
-        <div className="grid gap-8 lg:grid-cols-2">
-           <Card className="border-none shadow-premium overflow-hidden bg-background/50 backdrop-blur-xl">
-             <header className="px-10 py-8 border-b border-border/40 flex items-center justify-between">
-                <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-3">
-                  <BarChart3 className="h-5 w-5 text-primary" /> Live Deployments
-                </h3>
-                <Link to={`${basePath}/tasks`} className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline">Manage All</Link>
-             </header>
-             <CardContent className="p-0">
-                <div className="divide-y divide-border/30">
-                  {recentAssignments.map((a: any) => (
-                    <Link key={a._id} to={`${basePath}/tasks`} className="flex items-center gap-6 px-10 py-6 transition-all hover:bg-accent/5 group/row">
-                      <div className="h-12 w-12 rounded-2xl bg-accent flex items-center justify-center group-hover/row:scale-110 transition-transform">
-                        <Users className="h-6 w-6 text-muted-foreground group-hover/row:text-primary transition-colors" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <h4 className="text-sm font-black tracking-tight truncate group-hover/row:text-primary transition-colors">{a.title}</h4>
-                          <span className="text-[10px] font-black bg-primary/10 text-primary px-3 py-1 rounded-full uppercase tracking-tighter">{Math.round(a.progress)}%</span>
+              {/* TEAM DIRECTORY QUICK NAV */}
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-[32px] p-8 shadow-sm">
+                 <h2 className="text-[11px] font-black text-zinc-900 dark:text-zinc-50 uppercase tracking-[0.3em] mb-6">Team Resource Nodes</h2>
+                 <div className="flex flex-wrap gap-3">
+                    {user?.team && (
+                      <Link 
+                        to={`/admin/tasks?department=${user.team}`}
+                        className="flex items-center gap-4 bg-zinc-950 text-white transition-all px-6 py-4 rounded-2xl shadow-xl group"
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em]">{user.team} Command</span>
+                          <span className="text-[9px] font-bold opacity-60">View all team tasks</span>
                         </div>
-                        <Progress value={a.progress} className="h-1 bg-accent/40" />
-                        <div className="flex items-center justify-between mt-3 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                          <span>{a.assignedTo.name}</span>
-                          <span className="text-[8px] font-black bg-accent px-2 py-0.5 rounded opacity-50">{a.assignedTo.team}</span>
-                        </div>
+                        <ArrowUpRight className="h-5 w-5" />
+                      </Link>
+                    )}
+                    <Link 
+                      to="/admin/users"
+                      className="flex items-center gap-4 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 transition-all px-6 py-4 rounded-2xl border border-zinc-100 dark:border-zinc-700 group"
+                    >
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-900 dark:text-zinc-50">Manage Team</span>
+                        <span className="text-[9px] font-bold text-zinc-400">Directory Oversight</span>
                       </div>
+                      <Users className="h-4 w-4 text-zinc-400" />
                     </Link>
-                  ))}
-                </div>
-             </CardContent>
-           </Card>
-
-           <div className="grid grid-cols-2 gap-6">
-              {[
-                { title: "Team Intel", desc: "Manage workspace roles", icon: Users, color: "text-blue-500", bg: "bg-blue-500/10", link: `${basePath}/users` },
-                { title: "Daily Pulse", desc: "Live activity tracking", icon: Activity, color: "text-amber-500", bg: "bg-amber-500/10", link: `${basePath}/today` },
-                { title: "SEO Matrix", desc: "Digital footprint analysis", icon: BarChart3, color: "text-emerald-500", bg: "bg-emerald-500/10", link: `${basePath}/seo-reports` },
-                { title: "Messages", desc: "Team collaboration", icon: TrendingUp, color: "text-primary", bg: "bg-primary/10", link: `${basePath}/messages` },
-              ].map((tool, i) => (
-                <Link key={i} to={tool.link} className="group p-8 rounded-[2.5rem] bg-background shadow-premium border border-border/30 transition-all hover:shadow-2xl hover:-translate-y-2 hover:border-primary/30">
-                  <div className={cn("h-16 w-16 rounded-[1.5rem] flex items-center justify-center mb-6 transition-all group-hover:scale-110 group-hover:rotate-3", tool.bg)}>
-                    <tool.icon className={cn("h-8 w-8", tool.color)} />
-                  </div>
-                  <h4 className="text-sm font-black uppercase tracking-wider group-hover:text-primary transition-colors">{tool.title}</h4>
-                  <p className="text-[10px] text-muted-foreground font-black uppercase mt-1.5 opacity-60">{tool.desc}</p>
-                </Link>
-              ))}
+                 </div>
+              </div>
            </div>
+
+           <div className="lg:col-span-4 space-y-8">
+              {/* MEMBER PERFORMANCE */}
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-[32px] p-8 shadow-sm">
+                 <h2 className="text-[11px] font-black text-zinc-900 dark:text-zinc-50 uppercase tracking-[0.3em] mb-8">Personnel Efficiency</h2>
+                 <div className="space-y-8">
+                    {memberPerformance.map((mem, i) => (
+                      <div key={i} className="space-y-3">
+                        <div className="flex items-center justify-between">
+                           <div className="flex items-center gap-4">
+                              <Avatar className="h-10 w-10 border-2 border-zinc-50 shadow-sm">
+                                 <AvatarFallback className="bg-zinc-50 text-[10px] font-black text-zinc-400 uppercase">
+                                   {mem.name.split(" ").map((n:any)=>n[0]).join("")}
+                                 </AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0">
+                                 <p className="text-[13px] font-black text-zinc-900 truncate leading-none">{mem.name}</p>
+                                 <p className="text-[9px] font-bold text-zinc-400 uppercase mt-1.5">{mem.assigned} Assignments</p>
+                              </div>
+                           </div>
+                           <span className="text-xs font-black tabular-nums">{mem.progress}%</span>
+                        </div>
+                        <div className="h-1.5 w-full bg-zinc-50 dark:bg-zinc-800 rounded-full overflow-hidden border border-zinc-100/50">
+                           <div className="h-full bg-emerald-500 transition-all duration-1000 shadow-[0_0_10px_rgba(16,185,129,0.3)]" style={{ width: `${mem.progress}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                 </div>
+              </div>
+
+              {/* RECENT ACTIONS */}
+              <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-8 rounded-[40px] relative overflow-hidden">
+                 <div className="absolute top-0 right-0 p-8 opacity-10">
+                    <Target className="h-32 w-32" />
+                 </div>
+                 <h2 className="text-[11px] font-black text-zinc-900 dark:text-zinc-50 uppercase tracking-[0.3em] mb-8 relative z-10">Recent Operations</h2>
+                 <div className="space-y-6 relative z-10">
+                    {allTasks.slice(0, 4).map((t, i) => (
+                      <div key={i} className="bg-white dark:bg-zinc-950 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm group hover:border-zinc-900 transition-all">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <p className="text-[12px] font-black text-zinc-900 dark:text-zinc-50 truncate pr-4">{t.title}</p>
+                          <span className={cn("h-2 w-2 rounded-full", t.status === 'completed' ? "bg-emerald-500" : "bg-blue-500")} />
+                        </div>
+                        <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-tighter">Assigned To: {t.assignedTo?.name}</p>
+                      </div>
+                    ))}
+                 </div>
+              </div>
+           </div>
+
         </div>
-      </div>
+      </motion.div>
     </AppShell>
   );
 }

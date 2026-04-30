@@ -5,7 +5,24 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronRight, Search, Users, ShieldCheck, Mail, Briefcase, Plus, X, Loader2 } from "lucide-react";
+import { 
+  ChevronRight, 
+  Search, 
+  Users, 
+  ShieldCheck, 
+  Mail, 
+  Briefcase, 
+  Plus, 
+  X, 
+  Loader2, 
+  UserPlus,
+  Lock,
+  Unlock,
+  Filter,
+  Check,
+  Calendar,
+  AlertCircle
+} from "lucide-react";
 import { toast } from "sonner";
 import { admin, auth } from "@/lib/api";
 import {
@@ -32,7 +49,7 @@ function InviteUserDialog({ onUserAdded, currentUserRole }: { onUserAdded: () =>
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<"admin" | "employee">("employee");
-  const [team, setTeam] = useState("Engineering");
+  const [team, setTeam] = useState("Management");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleInvite = async (e: React.FormEvent) => {
@@ -41,19 +58,18 @@ function InviteUserDialog({ onUserAdded, currentUserRole }: { onUserAdded: () =>
     try {
       const response = await auth.register(name, email, password, role, team);
       if (response.success) {
-        toast.success("Identity deployed successfully!");
+        toast.success("User successfully added.");
         setOpen(false);
         onUserAdded();
         setName("");
         setEmail("");
         setPassword("");
         setRole("employee");
-        setTeam("Engineering");
       } else {
-        toast.error(response.message || "Deployment failed");
+        toast.error(response.message || "Failed to add user.");
       }
     } catch (error: any) {
-      toast.error(error.message || "System error during deployment");
+      toast.error(error.message || "An error occurred.");
     } finally {
       setIsSubmitting(false);
     }
@@ -62,72 +78,64 @@ function InviteUserDialog({ onUserAdded, currentUserRole }: { onUserAdded: () =>
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="h-11 px-6 rounded-2xl bg-primary text-white shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all hover:scale-[1.02] active:scale-95">
-          <Plus className="mr-2 h-5 w-5" /> Add Intelligence Node
+        <Button className="h-9 px-4 rounded-md bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs font-bold shadow-sm hover:bg-zinc-800 transition-all">
+          <UserPlus className="mr-2 h-4 w-4" /> Add User
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden border-none bg-background shadow-2xl rounded-[2rem]">
-        <div className="relative h-32 bg-primary flex items-center px-10 overflow-hidden">
-           <div className="absolute right-0 top-0 h-40 w-40 -translate-y-12 translate-x-12 rounded-full bg-white/10 blur-3xl" />
-           <div className="relative z-10 text-white">
-              <DialogTitle className="text-2xl font-black tracking-tight">Deploy New Identity</DialogTitle>
-              <DialogDescription className="text-white/70 font-medium text-xs uppercase tracking-widest mt-1">
-                 Workspace infrastructure management
-              </DialogDescription>
-           </div>
-           <button onClick={() => setOpen(false)} className="absolute top-6 right-6 h-8 w-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors">
-              <X className="h-4 w-4" />
-           </button>
-        </div>
-        <form onSubmit={handleInvite} className="px-10 py-10 space-y-6">
+      <DialogContent className="sm:max-w-[460px] p-0 overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-2xl rounded-xl">
+        <header className="px-8 py-6 border-b border-zinc-100 dark:border-zinc-900">
+           <DialogTitle className="text-lg font-bold tracking-tight">Add New User</DialogTitle>
+           <DialogDescription className="text-xs font-medium text-zinc-500 mt-1">Create a new account for an admin or employee.</DialogDescription>
+        </header>
+        <form onSubmit={handleInvite} className="px-8 py-8 space-y-6">
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Full Name</Label>
-              <div className="relative">
-                 <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
-                 <Input placeholder="John Doe" value={name} onChange={e => setName(e.target.value)} required className="h-12 pl-10 rounded-xl bg-accent/30 border-none focus:ring-2 ring-primary/20" />
-              </div>
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Full Name</Label>
+              <Input placeholder="e.g. John Doe" value={name} onChange={e => setName(e.target.value)} required className="h-10 rounded-md bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-xs font-medium focus:ring-1 ring-zinc-200" />
             </div>
             <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Work Email</Label>
-              <div className="relative">
-                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
-                 <Input type="email" placeholder="john@company.com" value={email} onChange={e => setEmail(e.target.value)} required className="h-12 pl-10 rounded-xl bg-accent/30 border-none focus:ring-2 ring-primary/20" />
-              </div>
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Email Address</Label>
+              <Input type="email" placeholder="john@example.com" value={email} onChange={e => setEmail(e.target.value)} required className="h-10 rounded-md bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-xs font-medium focus:ring-1 ring-zinc-200" />
             </div>
           </div>
           
           <div className="space-y-2">
-            <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Secure Password</Label>
-            <Input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required className="h-12 rounded-xl bg-accent/30 border-none focus:ring-2 ring-primary/20" />
+            <Label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Password</Label>
+            <Input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required className="h-10 rounded-md bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-xs font-medium focus:ring-1 ring-zinc-200" />
           </div>
 
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Access Tier</Label>
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">User Role</Label>
               <Select value={role} onValueChange={(v: "admin"|"employee") => setRole(v)}>
-                <SelectTrigger className="h-12 rounded-xl bg-accent/30 border-none focus:ring-2 ring-primary/20">
+                <SelectTrigger className="h-10 rounded-md bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-xs font-medium">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="employee">Employee</SelectItem>
+                <SelectContent className="rounded-lg border-zinc-200 dark:border-zinc-800">
+                  <SelectItem value="employee" className="text-xs font-medium">Employee</SelectItem>
                   {currentUserRole === "master_admin" && (
-                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="admin" className="text-xs font-medium">Admin</SelectItem>
                   )}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Department</Label>
-              <div className="relative">
-                 <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
-                 <Input value={team} onChange={e => setTeam(e.target.value)} required className="h-12 pl-10 rounded-xl bg-accent/30 border-none focus:ring-2 ring-primary/20" placeholder="Engineering" />
-              </div>
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Department</Label>
+              <Select value={team} onValueChange={setTeam}>
+                <SelectTrigger className="h-10 rounded-md bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-xs font-medium">
+                  <SelectValue placeholder="Select Department" />
+                </SelectTrigger>
+                <SelectContent className="rounded-lg border-zinc-200 dark:border-zinc-800">
+                   {["Design", "Tech", "Management", "SEO"].map((d) => (
+                      <SelectItem key={d} value={d} className="text-xs font-medium">{d}</SelectItem>
+                   ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
-          <DialogFooter className="pt-6">
-            <Button type="submit" className="w-full h-12 rounded-xl bg-primary text-white font-black uppercase tracking-[0.2em] shadow-lg shadow-primary/20" disabled={isSubmitting}>
-              {isSubmitting ? "Deploying..." : "Confirm Deployment"}
+          <DialogFooter className="pt-4">
+            <Button type="submit" className="w-full h-11 rounded-md bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 font-bold text-xs uppercase tracking-widest shadow-lg" disabled={isSubmitting}>
+              {isSubmitting ? "Adding..." : "Add User"}
             </Button>
           </DialogFooter>
         </form>
@@ -139,6 +147,8 @@ function InviteUserDialog({ onUserAdded, currentUserRole }: { onUserAdded: () =>
 export default function AllUsers() {
   const [users, setUsers] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState(""); // Joined Date Filter
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -146,18 +156,29 @@ export default function AllUsers() {
     try {
       setIsLoading(true);
       const [usersRes, profileRes] = await Promise.all([
-        admin.getAllUsers(100, 0),
+        admin.getAllUsers(2000, 0),
         auth.getProfile()
       ]);
       
+      // Extensive logging for debugging "no users" issue
+      console.log("Directory Sync Data:", usersRes.data);
+      console.log("Current Profile:", profileRes.data);
+
       if (usersRes.success && usersRes.data) {
-        setUsers(usersRes.data);
+        // Support both direct array and { users: [] } patterns
+        const dataArray = Array.isArray(usersRes.data) ? usersRes.data : usersRes.data.users || [];
+        
+        const normalized = dataArray.map((u: any) => ({
+          ...u,
+          team: u.team === "Development" ? "Tech" : u.team
+        }));
+        setUsers(normalized);
       }
       if (profileRes.success && profileRes.data) {
         setCurrentUser(profileRes.data);
       }
     } catch (error) {
-      toast.error("Global directory sync failed");
+      toast.error("Failed to load user directory.");
     } finally {
       setIsLoading(false);
     }
@@ -167,87 +188,170 @@ export default function AllUsers() {
     fetchData();
   }, []);
 
-  const filteredUsers = users.filter((u) =>
-    u.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter based on user roles and search term
+  const visibleUsers = users.filter((u) => {
+    if (!currentUser) return false;
+    
+    // Fallback ID mapping
+    const currentUserId = currentUser.userId || currentUser.id || currentUser._id;
+    const targetUserId = u.id || u._id;
+    
+    // Only exclude self if necessary (User wants to see Preeti, so if they ARE Preeti, they won't see themselves)
+    // I'll keep the exclusion to prevent managing self-permissions
+    if (currentUserId && targetUserId && currentUserId === targetUserId) return false;
+
+    const userRole = (u.role || "").toLowerCase();
+    const myRole = (currentUser.role || "").toLowerCase();
+
+    // EXTREMELY PERMISSIVE ROLE CHECKING
+    if (myRole === "master_admin") {
+      return userRole.includes("admin") || userRole.includes("employee");
+    } else if (myRole === "admin") {
+      // Admins should see all employees
+      return userRole.includes("employee");
+    }
+    return false;
+  }).filter(u => {
+    const matchesSearch = u.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         u.email?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesDept = departmentFilter === "all" || u.team === departmentFilter;
+    
+    let matchesDate = true;
+    if (dateFilter) {
+       const joinedDate = new Date(u.joinedAt || u.createdAt).toDateString();
+       const filterDate = new Date(dateFilter).toDateString();
+       matchesDate = joinedDate === filterDate;
+    }
+
+    return matchesSearch && matchesDept && matchesDate;
+  });
+
+  // Dynamic Departments for Filter
+  const departments = Array.from(new Set(users.map(u => u.team || "Operations")));
+  if (!departments.includes("Design")) departments.push("Design");
+  if (!departments.includes("Tech")) departments.push("Tech");
+  if (!departments.includes("Management")) departments.push("Management");
+  if (!departments.includes("SEO")) departments.push("SEO");
+  const sortedDepts = departments.sort();
 
   return (
     <AppShell
       role={currentUser?.role || "admin"}
-      title="Team Directory"
-      subtitle={`Enterprise-wide mapping of ${users.length} active intelligence nodes.`}
+      title="All Users"
+      subtitle={`Enterprise database: ${users.length} registered nodes.`}
       actions={currentUser && <InviteUserDialog onUserAdded={fetchData} currentUserRole={currentUser.role} />}
     >
-      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-        <div className="flex items-center gap-4">
-          <div className="relative group flex-1 max-w-md">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-            <Input 
-              placeholder="Filter by identity or nexus..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="h-12 pl-12 rounded-2xl bg-background border-border/40 shadow-premium group-focus-within:ring-2 ring-primary/20 transition-all" 
-            />
-          </div>
-          <div className="hidden md:flex items-center gap-2 px-6 h-12 rounded-2xl bg-accent/30 border border-border/40 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-             <ShieldCheck className="h-4 w-4 text-primary" /> Verified Environment
-          </div>
+      <div className="max-w-[1300px] mx-auto px-6 py-8 space-y-10 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        
+        {/* REFINED FILTER BAR */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-zinc-100 dark:border-zinc-900 pb-8">
+           <div className="flex flex-1 items-center gap-3 max-w-4xl">
+              <div className="relative group flex-1">
+                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400 transition-colors group-focus-within:text-zinc-900" />
+                 <Input 
+                   placeholder="Name or email..." 
+                   value={searchTerm}
+                   onChange={(e) => setSearchTerm(e.target.value)}
+                   className="h-10 pl-10 rounded-md bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-xs font-medium shadow-sm transition-all focus:ring-1 ring-zinc-200" 
+                 />
+              </div>
+              
+              <div className="flex items-center gap-2 px-3 h-10 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
+                 <Calendar className="h-3.5 w-3.5 text-zinc-400" />
+                 <input 
+                   type="date" 
+                   value={dateFilter}
+                   onChange={(e) => setDateFilter(e.target.value)}
+                   className="bg-transparent border-none text-[10px] font-bold uppercase outline-none focus:ring-0 w-24"
+                 />
+                 {dateFilter && (
+                   <button onClick={() => setDateFilter("")} className="text-zinc-400 hover:text-rose-500">
+                      <X className="h-3 w-3" />
+                   </button>
+                 )}
+              </div>
+
+              <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                 <SelectTrigger className="h-10 w-[160px] rounded-md bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-xs font-bold uppercase tracking-wider">
+                    <SelectValue placeholder="Department" />
+                 </SelectTrigger>
+                 <SelectContent className="rounded-lg border-zinc-200 dark:border-zinc-800">
+                    <SelectItem value="all" className="text-xs font-bold">All Categories</SelectItem>
+                    {sortedDepts.map(d => (
+                       <SelectItem key={d} value={d} className="text-xs font-bold uppercase tracking-tighter">{d}</SelectItem>
+                    ))}
+                 </SelectContent>
+              </Select>
+           </div>
+           <div className="flex items-center gap-2 px-4 h-10 rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/50 text-[10px] font-bold uppercase tracking-wider text-emerald-600">
+              <ShieldCheck className="h-3.5 w-3.5" /> Real Data Sync
+           </div>
         </div>
 
         {isLoading ? (
           <div className="flex h-60 items-center justify-center">
-             <Loader2 className="h-10 w-10 animate-spin text-primary" />
+             <Loader2 className="h-6 w-6 animate-spin text-zinc-300" />
           </div>
         ) : (
-          <div className="grid gap-4">
-            {filteredUsers.map((u) => {
+          <div className="grid gap-3">
+            {visibleUsers.length > 0 ? visibleUsers.map((u) => {
               const basePath = currentUser?.role === "master_admin" ? "/master-admin" : "/admin";
               return (
               <Link
                 key={u.id || u._id}
                 to={`${basePath}/users/${u.id || u._id}`}
-                className="group relative flex items-center gap-6 p-6 rounded-[2rem] bg-background border border-border/40 shadow-premium transition-all hover:shadow-2xl hover:-translate-y-1 hover:border-primary/30"
+                className="group flex items-center justify-between p-5 rounded-lg bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 shadow-sm transition-all hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-md"
               >
-                <div className="relative">
-                   <Avatar className="h-14 w-14 border-2 border-background shadow-lg transition-transform group-hover:scale-110">
-                     <AvatarFallback className="bg-primary text-white text-sm font-black">
-                       {u.name?.split(" ").map((p: string) => p[0]).slice(0, 2).join("")}
-                     </AvatarFallback>
-                   </Avatar>
-                   {u.isActive !== false && (
-                     <div className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-success border-4 border-background" />
-                   )}
+                <div className="flex items-center gap-5">
+                   <div className="relative">
+                      <Avatar className="h-10 w-10 border border-zinc-100 dark:border-zinc-800 shadow-sm transition-transform group-hover:scale-105">
+                        <AvatarFallback className="bg-zinc-50 dark:bg-zinc-800 text-zinc-400 text-[10px] font-bold">
+                          {u.name?.split(" ").map((p: string) => p[0]).slice(0, 2).join("")}
+                        </AvatarFallback>
+                      </Avatar>
+                      {u.isActive !== false ? (
+                        <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-500 border-2 border-white dark:border-zinc-900 shadow-sm" />
+                      ) : (
+                        <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-rose-500 border-2 border-white dark:border-zinc-900 shadow-sm" />
+                      )}
+                   </div>
+
+                   <div className="min-w-0">
+                     <div className="flex items-center gap-2">
+                       <h4 className="text-[13px] font-semibold text-zinc-900 dark:text-zinc-50 tracking-tight">{u.name}</h4>
+                       <span className={cn(
+                         "text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border",
+                         (u.role || "").toLowerCase().includes("admin") ? "bg-amber-50 text-amber-600 border-amber-200/50" : "bg-zinc-50 text-zinc-500 border-zinc-200/50"
+                       )}>
+                         {u.role}
+                       </span>
+                     </div>
+                     <div className="flex items-center gap-3 mt-0.5 text-[10px] font-medium text-zinc-400 tracking-tighter">
+                       <span className="truncate max-w-[150px]">{u.email}</span>
+                       <span className="h-1 w-1 rounded-full bg-zinc-200" />
+                       <span className="uppercase font-bold text-zinc-900 dark:text-zinc-300">{u.team || "Operations"}</span>
+                     </div>
+                   </div>
                 </div>
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3">
-                    <h4 className="text-base font-black tracking-tight group-hover:text-primary transition-colors">{u.name}</h4>
-                    <span className={cn(
-                      "text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full",
-                      u.role === "master_admin" ? "bg-primary/10 text-primary" : "bg-accent text-muted-foreground"
-                    )}>
-                      {u.role}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-4 mt-1 text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                    <span>{u.email}</span>
-                    <span className="h-1 w-1 rounded-full bg-border" />
-                    <span>{u.team || "Operations"}</span>
-                  </div>
-                </div>
-
-                <div className="hidden md:flex flex-col items-end gap-1 px-8 border-l border-border/40">
-                   <span className="text-[10px] font-black uppercase text-muted-foreground tracking-tighter">System Output</span>
-                   <span className="text-sm font-black">{u.totalLogs || 0} Logs</span>
-                </div>
-
-                <div className="h-12 w-12 rounded-2xl bg-accent/50 flex items-center justify-center transition-all group-hover:bg-primary group-hover:text-white group-hover:translate-x-2">
-                   <ChevronRight className="h-5 w-5" />
+                <div className="flex items-center gap-8">
+                   <div className="hidden lg:flex flex-col items-end gap-0.5 px-6 border-r border-zinc-100 dark:border-zinc-800">
+                      <span className="text-[9px] font-bold uppercase text-zinc-300 dark:text-zinc-700 tracking-wider">Total Output</span>
+                      <span className="text-[11px] font-bold text-zinc-500">{u.totalLogs || 0} Tasks</span>
+                   </div>
+                   <div className="h-8 w-8 rounded-md bg-zinc-50 dark:bg-zinc-800 flex items-center justify-center text-zinc-300 group-hover:bg-zinc-900 group-hover:text-white transition-all">
+                      <ChevronRight className="h-4 w-4" />
+                   </div>
                 </div>
               </Link>
               );
-            })}
+            }) : (
+              <div className="p-16 text-center border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl">
+                 <AlertCircle className="h-10 w-10 text-zinc-200 mx-auto mb-4" />
+                 <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">No active users detected in this segment.</p>
+                 <p className="text-[10px] text-zinc-400 mt-2 uppercase">Verify your search criteria or hierarchical access.</p>
+              </div>
+            )}
           </div>
         )}
       </div>
