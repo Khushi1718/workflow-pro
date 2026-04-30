@@ -42,7 +42,7 @@ function CountUp({ value }: { value: number }) {
 
   useEffect(() => {
     const controls = animate(0, value, {
-      duration: 1.5,
+      duration: 0.3,
       ease: "easeOut",
       onUpdate: (latest) => setDisplayValue(Math.floor(latest))
     });
@@ -146,7 +146,9 @@ export default function MasterAdminDashboard() {
         });
 
         // Collect unique teams/departments from users
-        const teams = Array.from(new Set(usersData.map((u: any) => u.team).filter(Boolean))) as string[];
+        const teams = Array.from(new Set(usersData.map((u: any) => 
+          u.team === "Development" ? "Tech" : u.team
+        ).filter(Boolean))) as string[];
         setAvailableTeams(teams);
 
         // Admin Performance
@@ -236,10 +238,10 @@ export default function MasterAdminDashboard() {
         {/* DYNAMIC GREETING HEADER */}
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-8">
           <div>
-            <h1 className="text-4xl font-black tracking-tight text-zinc-900 dark:text-zinc-50 flex items-center gap-4">
-              {getGreeting()}, {user?.name.split(" ")[0]} <Sparkles className="h-6 w-6 text-amber-400 animate-pulse" />
+            <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-zinc-50 flex items-center gap-4">
+              {getGreeting()}, {user?.name} <Sparkles className="h-5 w-5 text-amber-400 animate-pulse" />
             </h1>
-            <p className="text-[12px] font-black text-zinc-400 uppercase tracking-[0.5em] mt-3">Enterprise Workforce Management • Real-time Task Velocity</p>
+            <p className="text-[11px] font-black text-zinc-400 uppercase tracking-[0.4em] mt-3">Enterprise Workforce Management • Real-time Task Velocity</p>
           </div>
           <div className="flex items-center gap-4">
              <Button asChild variant="outline" className="h-12 px-6 rounded-2xl border-zinc-200 bg-white shadow-sm text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] transition-all">
@@ -306,9 +308,9 @@ export default function MasterAdminDashboard() {
             </h3>
             <div className="grid grid-cols-2 gap-5 h-full">
               {[
-                { label: "All Staff", value: stats.usersTotal, icon: Users, color: "text-zinc-900", bg: "bg-zinc-50" },
+                { label: "Total Staff", value: stats.usersTotal, icon: Users, color: "text-zinc-900", bg: "bg-zinc-50" },
                 { label: "Admins", value: stats.adminsCount, icon: ShieldCheck, color: "text-blue-600", bg: "bg-blue-50/30" },
-                { label: "Online Now", value: stats.employeesOnline, icon: Globe, color: "text-emerald-600", bg: "bg-emerald-50/30", full: true }
+                { label: "Active Work Bundles", value: allAssignments.length, icon: Layers, color: "text-emerald-600", bg: "bg-emerald-50/30", full: true }
               ].map((s, i) => (
                 <div key={i} className={cn("p-7 rounded-[32px] border border-zinc-100 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all", s.bg, s.full && "col-span-2")}>
                   <div className="flex items-center justify-between mb-4">
@@ -384,30 +386,6 @@ export default function MasterAdminDashboard() {
                </div>
             </div>
 
-            {/* TASK PROGRESS FLOW */}
-            <div className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-[48px] p-10 shadow-sm">
-               <h2 className="text-[13px] font-black text-zinc-950 dark:text-zinc-50 uppercase tracking-[0.4em] mb-12 text-center">Task Progression Flow</h2>
-               <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-                  {[
-                    { label: "Assigned", sub: "Master Level", value: stats.totalTasks, icon: Shield, color: "text-zinc-900" },
-                    { label: "Pending", sub: "Waiting", value: stats.pendingTasks, icon: Layers, color: "text-amber-500" },
-                    { label: "In Progress", sub: "Active", value: stats.activeTasks, icon: Target, color: "text-blue-500" },
-                    { label: "Completed", sub: "Done", value: stats.completedTasks, icon: CheckCircle2, color: "text-emerald-500" }
-                  ].map((flow, i) => (
-                    <div key={i} className="relative group">
-                      <div className="flex flex-col items-center text-center p-8 bg-zinc-50 dark:bg-zinc-800 rounded-[40px] border border-zinc-100">
-                        <div className="h-12 w-12 rounded-2xl bg-white dark:bg-zinc-900 flex items-center justify-center mb-6 shadow-sm border border-zinc-100">
-                          <flow.icon className={cn("h-6 w-6", flow.color)} />
-                        </div>
-                        <span className="text-3xl font-black mb-1.5 tracking-tighter"><CountUp value={flow.value} /></span>
-                        <span className="text-[11px] font-black uppercase tracking-[0.2em] text-zinc-900">{flow.label}</span>
-                        <span className="text-[9px] font-bold uppercase tracking-tighter text-zinc-400 mt-1">{flow.sub}</span>
-                      </div>
-                      {i < 3 && <div className="hidden md:block absolute top-1/2 -right-4 -translate-y-1/2 z-10"><ChevronRight className="h-5 w-5 text-zinc-200" /></div>}
-                    </div>
-                  ))}
-               </div>
-            </div>
           </div>
 
           {/* SIDEBAR */}

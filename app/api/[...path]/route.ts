@@ -975,28 +975,11 @@ export async function GET(request: NextRequest, context: Context) {
       }
     }
 
-    if (q) {
-      filter.title = { $regex: q, $options: "i" };
-    }
-
-    if (date) {
-      const start = new Date(date);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(date);
-      end.setHours(23, 59, 59, 999);
-      filter.createdAt = { $gte: start, $lte: end };
-    }
-
+    // 1. Initial base filter (Date, Basic ID filters)
+    const baseFilter: any = { ...filter };
+    
     const pipeline: any[] = [
-      { $match: filter },
-      {
-        $lookup: {
-          from: "tasks",
-          localField: "_id",
-          foreignField: "assignmentId",
-          as: "tasks"
-        }
-      },
+      { $match: baseFilter },
       {
         $lookup: {
           from: "users",
@@ -1005,14 +988,57 @@ export async function GET(request: NextRequest, context: Context) {
           as: "assignedToInfo"
         }
       },
-      { $unwind: "$assignedToInfo" }
+      { $unwind: { path: "$assignedToInfo", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "users",
+          localField: "assignedBy",
+          foreignField: "_id",
+          as: "assignedByInfo"
+        }
+      },
+      { $unwind: { path: "$assignedByInfo", preserveNullAndEmptyArrays: true } }
     ];
 
+    if (date) {
+      const start = new Date(date);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(date);
+      end.setHours(23, 59, 59, 999);
+      baseFilter.createdAt = { $gte: start, $lte: end };
+    }
+
+    // 2. Search filter (requires looked-up info)
+    if (q) {
+      pipeline.push({
+        $match: {
+          $or: [
+            { title: { $regex: q, $options: "i" } },
+            { "assignedToInfo.name": { $regex: q, $options: "i" } },
+            { "assignedByInfo.name": { $regex: q, $options: "i" } }
+          ]
+        }
+      });
+    }
+
+    // 3. Department filter
     if (department) {
       pipeline.push({
         $match: { "assignedToInfo.team": { $regex: department, $options: "i" } }
       });
     }
+
+    // 4. Tasks lookup
+    pipeline.push(
+      {
+        $lookup: {
+          from: "tasks",
+          localField: "_id",
+          foreignField: "assignmentId",
+          as: "tasks"
+        }
+      }
+    );
 
     pipeline.push(
       {

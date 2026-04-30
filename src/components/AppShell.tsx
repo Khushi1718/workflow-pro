@@ -120,6 +120,7 @@ export function AppShell({
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (user) return;
     const fetchUser = async () => {
       try {
         const res = await auth.getProfile();
@@ -134,7 +135,7 @@ export function AppShell({
       }
     };
     fetchUser();
-  }, [navigate]);
+  }, [navigate, user]);
 
   if (!user) {
     return (

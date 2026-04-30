@@ -612,7 +612,7 @@ export default function TaskBoard({
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
               <Input 
                 className="pl-9 h-10 w-64 bg-background/50 border-border/50 shadow-sm focus:ring-1 focus:w-80 transition-all duration-300" 
-                placeholder="Search assignments..." 
+                placeholder="Search by assignment, employee, or admin..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />

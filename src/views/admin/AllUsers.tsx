@@ -121,16 +121,13 @@ function InviteUserDialog({ onUserAdded, currentUserRole }: { onUserAdded: () =>
             </div>
             <div className="space-y-2">
               <Label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Department</Label>
-              <Select value={team} onValueChange={setTeam}>
-                <SelectTrigger className="h-10 rounded-md bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-xs font-medium">
-                  <SelectValue placeholder="Select Department" />
-                </SelectTrigger>
-                <SelectContent className="rounded-lg border-zinc-200 dark:border-zinc-800">
-                   {["Design", "Tech", "Management", "SEO"].map((d) => (
-                      <SelectItem key={d} value={d} className="text-xs font-medium">{d}</SelectItem>
-                   ))}
-                </SelectContent>
-              </Select>
+              <Input 
+                placeholder="e.g. Tech, SEO, Editing" 
+                value={team} 
+                onChange={e => setTeam(e.target.value)} 
+                required 
+                className="h-10 rounded-md bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-xs font-bold uppercase focus:ring-1 ring-zinc-200" 
+              />
             </div>
           </div>
           <DialogFooter className="pt-4">
@@ -148,9 +145,21 @@ export default function AllUsers() {
   const [users, setUsers] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
+  const [roleFilter, setRoleFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState(""); // Joined Date Filter
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Read query params on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const dept = params.get("department");
+      const role = params.get("role");
+      if (dept) setDepartmentFilter(dept);
+      if (role) setRoleFilter(role);
+    }
+  }, []);
   
   const fetchData = async () => {
     try {
@@ -215,6 +224,7 @@ export default function AllUsers() {
     const matchesSearch = u.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          u.email?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDept = departmentFilter === "all" || u.team === departmentFilter;
+    const matchesRole = roleFilter === "all" || (u.role || "").toLowerCase() === roleFilter.toLowerCase();
     
     let matchesDate = true;
     if (dateFilter) {
@@ -223,16 +233,12 @@ export default function AllUsers() {
        matchesDate = joinedDate === filterDate;
     }
 
-    return matchesSearch && matchesDept && matchesDate;
+    return matchesSearch && matchesDept && matchesRole && matchesDate;
   });
 
   // Dynamic Departments for Filter
   const departments = Array.from(new Set(users.map(u => u.team || "Operations")));
-  if (!departments.includes("Design")) departments.push("Design");
-  if (!departments.includes("Tech")) departments.push("Tech");
-  if (!departments.includes("Management")) departments.push("Management");
-  if (!departments.includes("SEO")) departments.push("SEO");
-  const sortedDepts = departments.sort();
+  const sortedDepts = departments.filter(Boolean).sort();
 
   return (
     <AppShell

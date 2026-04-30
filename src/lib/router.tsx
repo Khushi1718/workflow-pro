@@ -2,7 +2,7 @@
 
 import NextLink from "next/link";
 import { useParams as useNextParams, usePathname, useRouter } from "next/navigation";
-import { AnchorHTMLAttributes, forwardRef } from "react";
+import { AnchorHTMLAttributes, forwardRef, useCallback } from "react";
 
 type LinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href" | "className"> & {
   to: string;
@@ -33,13 +33,16 @@ NavLink.displayName = "NavLink";
 
 export function useNavigate() {
   const router = useRouter();
-  return (to: string | number) => {
-    if (typeof to === "number") {
-      window.history.go(to);
-      return;
-    }
-    router.push(to);
-  };
+  return useCallback(
+    (to: string | number) => {
+      if (typeof to === "number") {
+        window.history.go(to);
+        return;
+      }
+      router.push(to);
+    },
+    [router]
+  );
 }
 
 export function useLocation() {

@@ -5,9 +5,7 @@ import { Button } from "@/components/ui/button";
 import { admin, auth, tasks } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { 
-  ArrowRight, 
   CheckCircle2, 
-  Clock, 
   Users, 
   Loader2, 
   ClipboardList, 
@@ -16,106 +14,158 @@ import {
   AlertTriangle,
   ArrowUpRight,
   ShieldCheck,
-  UserCheck,
-  Target,
-  FileText,
-  TrendingUp,
   Zap,
-  BarChart3,
+  Briefcase,
   Monitor,
-  Layout,
-  Briefcase
+  Clock,
+  Sparkles,
+  Globe,
+  Layers,
+  ChevronRight,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  History
 } from "lucide-react";
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from "recharts";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { motion } from "framer-motion";
+import { motion, animate } from "framer-motion";
+
+// CountUp Component for "Increasing Digits"
+function CountUp({ value }: { value: number }) {
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    const controls = animate(displayValue, value, {
+      duration: 0.3,
+      ease: "easeOut",
+      onUpdate: (latest) => setDisplayValue(Math.floor(latest))
+    });
+    return () => controls.stop();
+  }, [value]);
+
+  return <span>{displayValue}</span>;
+}
+
+const getGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good Morning";
+  if (hour < 17) return "Good Afternoon";
+  return "Good Evening";
+};
 
 export default function AdminDashboard() {
   const [user, setUser] = useState<any>(null);
-  const [allTasks, setAllTasks] = useState<any[]>([]);
-  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [allAssignments, setAllAssignments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [graphRange, setGraphRange] = useState<"this" | "last">("this");
 
-  const [stats, setStats] = useState({
-    totalTasks: 0,
-    activeTasks: 0,
-    completedTasks: 0,
-    todayCompleted: 0,
-    todayPending: 0,
-    overdueTasks: 0,
-    teamSize: 0,
-    teamActive: 0
+  const [byAdminStats, setByAdminStats] = useState({
+    total: 0, completed: 0, pending: 0, todayTotal: 0, todayCompleted: 0, todayPending: 0
   });
-
+  const [toAdminStats, setToAdminStats] = useState({
+    total: 0, completed: 0, pending: 0, todayTotal: 0, todayCompleted: 0, todayPending: 0
+  });
+  
+  const [recentLogs, setRecentLogs] = useState<any[]>([]);
   const [weeklyData, setWeeklyData] = useState<any[]>([]);
-  const [memberPerformance, setMemberPerformance] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        const [profileRes, tasksRes, usersRes] = await Promise.all([
+        const [profileRes, tasksRes] = await Promise.all([
           auth.getProfile(),
-          tasks.getAll("all"),
-          admin.getAllUsers()
+          tasks.getAll("all")
         ]);
 
-        if (profileRes.success) setUser(profileRes.data);
+        if (!profileRes.success) throw new Error("Profile fetch failed");
         
         const myProfile = profileRes.data;
-        const tasksData = tasksRes.data || [];
-        const usersData = usersRes.data || [];
-
-        // Filter tasks: assigned to me OR assigned by me
-        const filteredTasks = tasksData.filter((t: any) => 
-          (t.assignedTo?._id === myProfile._id || t.assignedTo === myProfile._id) ||
-          (t.assignedBy?._id === myProfile._id || t.assignedBy === myProfile._id)
-        );
+        setUser(myProfile);
         
-        setAllTasks(filteredTasks);
-
-        // Filter users: part of my team? 
-        // For simplicity in this layout, we show all employees if team is not strictly defined, 
-        // but here we filter by the admin's team if available.
-        const myTeamMembers = usersData.filter((u: any) => 
-          u.role === "employee" && (myProfile.team ? u.team === myProfile.team : true)
-        );
-        setTeamMembers(myTeamMembers);
+        const assignmentsData = tasksRes.data || [];
+        const myId = String(myProfile?._id || myProfile?.id || "");
 
         const now = new Date();
         const startOfToday = new Date();
         startOfToday.setHours(0, 0, 0, 0);
 
-        setStats({
-          totalTasks: filteredTasks.length,
-          activeTasks: filteredTasks.filter((t: any) => t.status === "in_progress").length,
-          completedTasks: filteredTasks.filter((t: any) => t.status === "completed").length,
-          todayCompleted: filteredTasks.filter((t: any) => t.status === "completed" && t.completedAt && new Date(t.completedAt) >= startOfToday).length,
-          todayPending: filteredTasks.filter((t: any) => t.status !== "completed" && new Date(t.createdAt) >= startOfToday).length,
-          overdueTasks: filteredTasks.filter((t: any) => t.status !== "completed" && new Date(t.deadline) < now).length,
-          teamSize: myTeamMembers.length,
-          teamActive: myTeamMembers.filter((u: any) => u.isActive).length
+        const getStrId = (u: any) => {
+          if (!u) return "";
+          if (typeof u === 'string') return u;
+          return String(u._id || u.id || "");
+        };
+
+        // Group A: Assigned BY me (to employees/others)
+        const assignedByMe = assignmentsData.filter((a: any) => {
+          const assignerId = getStrId(a.assignedBy);
+          const assigneeId = getStrId(a.assignedTo);
+          return assignerId === myId && assigneeId !== myId;
         });
 
-        // Member Performance (Top 5)
-        const perf = myTeamMembers.map((mem: any) => {
-          const memTasks = tasksData.filter((t: any) => t.assignedTo?._id === mem._id || t.assignedTo === mem._id);
-          const completed = memTasks.filter((t: any) => t.status === "completed").length;
-          return {
-            id: mem._id,
-            name: mem.name,
-            team: mem.team,
-            assigned: memTasks.length,
-            completed: completed,
-            progress: memTasks.length > 0 ? Math.round((completed / memTasks.length) * 100) : 0
-          };
-        }).sort((a, b) => b.assigned - a.assigned).slice(0, 5);
-        setMemberPerformance(perf);
+        // Group B: Assigned TO me (by master/others)
+        const assignedToMe = assignmentsData.filter((a: any) => {
+          const assigneeId = getStrId(a.assignedTo);
+          return assigneeId === myId;
+        });
+
+        const calculateGroupStats = (assignments: any[]) => {
+          let total = 0, completed = 0, pending = 0;
+          let todayTotal = 0, todayCompleted = 0, todayPending = 0;
+
+          assignments.forEach(a => {
+            // Priority: Sum of tasks or pre-calculated field
+            const aTotal = a.totalTasks || (a.tasks?.length || 0);
+            const aDone = a.completedTasks || (a.tasks?.filter((t: any) => t.status === 'completed').length || 0);
+            
+            total += aTotal;
+            completed += aDone;
+            pending += (aTotal - aDone);
+            
+            if (a.tasks && Array.isArray(a.tasks)) {
+              a.tasks.forEach((t: any) => {
+                const taskDoneAt = t.completedAt ? new Date(t.completedAt) : null;
+                const taskCreatedAt = new Date(a.createdAt);
+
+                if (taskCreatedAt >= startOfToday) todayTotal++;
+                if (t.status === "completed" && taskDoneAt && taskDoneAt >= startOfToday) todayCompleted++;
+                if (t.status !== "completed" && taskCreatedAt >= startOfToday) todayPending++;
+              });
+            } else if (new Date(a.createdAt) >= startOfToday) {
+               // Fallback if tasks array is missing but bundle was created today
+               todayTotal += aTotal;
+               todayPending += (aTotal - aDone);
+            }
+          });
+          return { total, completed, pending, todayTotal, todayCompleted, todayPending };
+        };
+
+        setByAdminStats(calculateGroupStats(assignedByMe));
+        setToAdminStats(calculateGroupStats(assignedToMe));
+        
+        // Activity Logs: Flatten tasks and sort by recency
+        const flattenedLogs: any[] = [];
+        assignmentsData.forEach((a: any) => {
+          if (a.tasks) {
+            a.tasks.forEach((t: any) => {
+              flattenedLogs.push({
+                ...t,
+                assignmentTitle: a.title,
+                assignedToName: a.assignedTo?.name,
+                assignedByName: a.assignedBy?.name,
+                updatedAt: t.updatedAt || a.updatedAt || a.createdAt
+              });
+            });
+          }
+        });
+        setRecentLogs(flattenedLogs.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).slice(0, 5));
+        
+        setAllAssignments(assignmentsData);
 
       } catch (error) {
-        toast.error("Dashboard sync failed");
+        console.error("Dashboard Sync Error:", error);
+        toast.error("Metrics synchronization failed");
       } finally {
         setIsLoading(false);
       }
@@ -124,210 +174,215 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    if (allTasks.length === 0) return;
+    if (allAssignments.length === 0) return;
 
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const now = new Date();
+    const currentDay = now.getDay();
+    const diffToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + diffToMonday);
+    monday.setHours(0, 0, 0, 0);
+
     const data = days.map((day, index) => {
-      const d = new Date();
-      const currentDay = d.getDay();
-      const diff = index + 1 - (currentDay === 0 ? 7 : currentDay);
-      
-      const targetDate = new Date();
-      targetDate.setDate(targetDate.getDate() + diff + (graphRange === "last" ? -7 : 0));
+      const targetDate = new Date(monday);
+      targetDate.setDate(monday.getDate() + index + (graphRange === "last" ? -7 : 0));
       const dateStr = targetDate.toISOString().split('T')[0];
 
-      return {
-        name: day,
-        assigned: allTasks.filter((t: any) => t.createdAt.startsWith(dateStr)).length,
-        completed: allTasks.filter((t: any) => t.completedAt && t.completedAt.startsWith(dateStr)).length
-      };
+      let assigned = 0;
+      let completed = 0;
+
+      allAssignments.forEach((a: any) => {
+        const aDate = typeof a.createdAt === 'string' ? a.createdAt : new Date(a.createdAt).toISOString();
+        if (aDate.startsWith(dateStr)) {
+          assigned += (a.totalTasks || (a.tasks?.length || 0));
+        }
+        if (a.tasks) {
+          a.tasks.forEach((t: any) => {
+            if (t.completedAt) {
+              const cDate = typeof t.completedAt === 'string' ? t.completedAt : new Date(t.completedAt).toISOString();
+              if (cDate.startsWith(dateStr)) completed += 1;
+            }
+          });
+        }
+      });
+
+      return { name: day, assigned, completed };
     });
     setWeeklyData(data);
-  }, [allTasks, graphRange]);
+  }, [allAssignments, graphRange]);
 
   if (isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
-        <Loader2 className="h-6 w-6 animate-spin text-zinc-400" />
+      <div className="flex h-screen items-center justify-center bg-[#fafafa] dark:bg-[#09090b]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-6 w-6 animate-spin text-zinc-900" />
+          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-400">Synchronizing Global Nodes...</p>
+        </div>
       </div>
     );
   }
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { staggerChildren: 0.05 } }
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 15 },
-    visible: { opacity: 1, y: 0 }
-  };
-
   return (
     <AppShell role="admin" title="Operations Control">
-      <motion.div 
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        className="max-w-[1500px] mx-auto px-8 py-10 space-y-8 pb-20"
-      >
+      <div className="max-w-[1600px] mx-auto px-10 py-12 space-y-12 pb-24">
+        
         {/* HEADER */}
-        <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-zinc-100 dark:border-zinc-900 pb-10">
-          <div className="space-y-1">
-            <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-zinc-50">
-              Operations Control
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-8">
+          <div>
+            <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-zinc-50 flex items-center gap-4">
+              {getGreeting()}, {user?.name} <Sparkles className="h-5 w-5 text-amber-400 animate-pulse" />
             </h1>
-            <p className="text-[11px] font-black text-zinc-400 uppercase tracking-[0.4em]">Administrator: {user?.name} • Team: {user?.team || "Global Operations"}</p>
+            <p className="text-[11px] font-black text-zinc-400 uppercase tracking-[0.4em] mt-3">Orchestrating excellence • Leading with strategic execution</p>
           </div>
-          <div className="flex items-center gap-3">
-             <Button asChild variant="outline" className="h-10 rounded-xl text-[10px] font-bold uppercase tracking-widest border-zinc-200 shadow-sm hover:bg-zinc-50 transition-all">
-                <Link to="/admin/today">Live Activity</Link>
+          <div className="flex items-center gap-4">
+             <Button asChild variant="outline" className="h-12 px-6 rounded-2xl border-zinc-200 bg-white shadow-sm text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] transition-all">
+                <Link to="/admin/today">Live Feed</Link>
              </Button>
-             <Button asChild className="h-10 rounded-xl bg-zinc-950 text-white text-[10px] font-bold uppercase tracking-widest px-6 shadow-xl hover:bg-zinc-800 transition-all">
-                <Link to="/admin/tasks"><Plus className="mr-2 h-4 w-4" /> Delegate Task</Link>
+             <Button asChild className="h-12 px-8 rounded-2xl bg-zinc-950 text-white shadow-xl text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] transition-all">
+                <Link to="/admin/tasks"><Plus className="mr-2 h-4 w-4" /> Delegate New Bundle</Link>
              </Button>
           </div>
         </header>
 
-        {/* KPI OVERVIEW */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-           {[
-             { label: "My Pipeline", value: stats.totalTasks, sub: "Assigned & Managed", icon: Briefcase, color: "text-zinc-900" },
-             { label: "Execution Today", value: stats.todayCompleted, sub: "Tasks Finalized", icon: CheckCircle2, color: "text-emerald-500" },
-             { label: "Resource Node", value: stats.teamActive, sub: "Active Team Members", icon: UserCheck, color: "text-blue-500" },
-             { label: "Priority Alerts", value: stats.overdueTasks, sub: "Overdue Items", icon: AlertTriangle, color: "text-rose-500" }
-           ].map((s, i) => (
-             <motion.div key={i} variants={itemVariants} className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 p-6 rounded-3xl shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                   <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{s.label}</p>
-                   <s.icon className={cn("h-4 w-4", s.color)} />
-                </div>
-                <h3 className="text-3xl font-black tracking-tight text-zinc-900 dark:text-zinc-50">{s.value}</h3>
-                <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-tighter mt-1">{s.sub}</p>
-             </motion.div>
-           ))}
+        {/* METRICS GRID */}
+        <div className="grid lg:grid-cols-2 gap-10">
+          
+          {/* SECTION 1: TEAM DELEGATION (ASSIGNED BY ME) */}
+          <section className="space-y-6">
+            <h3 className="text-[11px] font-black text-zinc-400 uppercase tracking-[0.4em] px-2 flex items-center gap-3">
+              <ArrowUpCircle className="h-4 w-4 text-emerald-500" /> Team Delegation Summary
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+               {[
+                 { label: "Total Assigned", value: byAdminStats.total, icon: Layers, bg: "bg-zinc-50" },
+                 { label: "Total Completed", value: byAdminStats.completed, icon: CheckCircle2, bg: "bg-emerald-50/30" },
+                 { label: "Total Pending", value: byAdminStats.pending, icon: Clock, bg: "bg-amber-50/30" },
+                 { label: "Assigned Today", value: byAdminStats.todayTotal, icon: Plus, bg: "bg-zinc-50" },
+                 { label: "Completed Today", value: byAdminStats.todayCompleted, icon: CheckCircle2, bg: "bg-emerald-50/30" },
+                 { label: "Pending Today", value: byAdminStats.todayPending, icon: Clock, bg: "bg-amber-50/30" }
+               ].map((s, i) => (
+                 <div key={i} className={cn("p-7 rounded-[32px] border border-zinc-100 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all", s.bg)}>
+                    <div className="flex items-center justify-between mb-3">
+                       <s.icon className="h-4 w-4 text-zinc-400" />
+                       <span className="text-2xl font-black tracking-tighter"><CountUp value={s.value} /></span>
+                    </div>
+                    <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{s.label}</p>
+                 </div>
+               ))}
+            </div>
+          </section>
+
+          {/* SECTION 2: MY TASKLOAD (ASSIGNED TO ME) */}
+          <section className="space-y-6">
+            <h3 className="text-[11px] font-black text-zinc-400 uppercase tracking-[0.4em] px-2 flex items-center gap-3">
+              <ArrowDownCircle className="h-4 w-4 text-blue-500" /> My Operational Taskload
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+               {[
+                 { label: "Total Tasks", value: toAdminStats.total, icon: Briefcase, bg: "bg-zinc-50" },
+                 { label: "Total Completed", value: toAdminStats.completed, icon: CheckCircle2, bg: "bg-emerald-50/30" },
+                 { label: "Total Pending", value: toAdminStats.pending, icon: Clock, bg: "bg-amber-50/30" },
+                 { label: "Incoming Today", value: toAdminStats.todayTotal, icon: Sparkles, bg: "bg-zinc-50" },
+                 { label: "Completed Today", value: toAdminStats.todayCompleted, icon: CheckCircle2, bg: "bg-emerald-50/30" },
+                 { label: "Pending Today", value: toAdminStats.todayPending, icon: Clock, bg: "bg-amber-50/30" }
+               ].map((s, i) => (
+                 <div key={i} className={cn("p-7 rounded-[32px] border border-zinc-100 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all", s.bg)}>
+                    <div className="flex items-center justify-between mb-3">
+                       <s.icon className="h-4 w-4 text-zinc-400" />
+                       <span className="text-2xl font-black tracking-tighter"><CountUp value={s.value} /></span>
+                    </div>
+                    <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{s.label}</p>
+                 </div>
+               ))}
+            </div>
+          </section>
         </div>
 
-        <div className="grid lg:grid-cols-12 gap-8">
+        {/* WEEKLY TREND (FULL WIDTH) */}
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-[48px] p-10 shadow-sm">
+           <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+              <div>
+                <h2 className="text-[13px] font-black text-zinc-950 dark:text-zinc-50 uppercase tracking-[0.4em]">Overall Weekly Trend</h2>
+                <p className="text-[11px] text-zinc-400 mt-2 uppercase font-bold tracking-widest">Delegated & Completed Task Velocity Across All Streams</p>
+              </div>
+              <div className="flex bg-zinc-50 dark:bg-zinc-800 p-1.5 rounded-2xl border border-zinc-100 self-start md:self-auto">
+                <button 
+                  onClick={() => setGraphRange("this")}
+                  className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", graphRange === "this" ? "bg-white text-zinc-950 shadow-md" : "text-zinc-400 hover:text-zinc-600")}
+                >
+                  Current
+                </button>
+                <button 
+                  onClick={() => setGraphRange("last")}
+                  className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", graphRange === "last" ? "bg-white text-zinc-950 shadow-md" : "text-zinc-400 hover:text-zinc-600")}
+                >
+                  Previous
+                </button>
+              </div>
+           </header>
+           <div className="h-[400px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={weeklyData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f1f1" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 800, fill: '#a1a1aa' }} dy={20} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 800, fill: '#a1a1aa' }} />
+                  <Tooltip contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 20px 50px rgba(0,0,0,0.1)', fontSize: '12px', fontWeight: 900 }} />
+                  <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', paddingBottom: '30px', letterSpacing: '0.1em' }} />
+                  <Line type="monotone" dataKey="assigned" name="Assigned" stroke="#18181b" strokeWidth={4} dot={{ r: 5, fill: '#18181b', strokeWidth: 3, stroke: '#fff' }} />
+                  <Line type="monotone" dataKey="completed" name="Completed" stroke="#10b981" strokeWidth={4} dot={{ r: 5, fill: '#10b981', strokeWidth: 3, stroke: '#fff' }} />
+                </LineChart>
+              </ResponsiveContainer>
+           </div>
+        </div>
+
+        {/* RECENT TASK LOGS (REPLACED PRIORITY ALERTS) */}
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-[48px] p-12 shadow-sm">
+           <header className="flex items-center justify-between mb-12">
+              <h2 className="text-[13px] font-black text-zinc-950 dark:text-zinc-50 uppercase tracking-[0.4em] flex items-center gap-3">
+                <History className="h-5 w-5 text-zinc-400" /> Recent Task Activity
+              </h2>
+              <Button asChild variant="ghost" className="text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-zinc-950">
+                 <Link to="/admin/today">View All Logs <ChevronRight className="ml-1 h-3 w-3" /></Link>
+              </Button>
+           </header>
            
-           <div className="lg:col-span-8 space-y-8">
-              {/* WEEKLY TREND */}
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-[32px] p-8 shadow-sm">
-                 <div className="flex items-center justify-between mb-8">
-                    <div>
-                      <h2 className="text-[11px] font-black text-zinc-900 dark:text-zinc-50 uppercase tracking-[0.3em]">Operational Weekly Trend</h2>
-                      <p className="text-[9px] text-zinc-400 mt-1 uppercase font-bold tracking-widest">Delegated vs Completed</p>
-                    </div>
-                    <div className="flex bg-zinc-50 dark:bg-zinc-800 p-1 rounded-xl">
-                      <button 
-                        onClick={() => setGraphRange("this")}
-                        className={cn("px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all", graphRange === "this" ? "bg-white text-zinc-950 shadow-sm" : "text-zinc-400 hover:text-zinc-600")}
-                      >
-                        Current
-                      </button>
-                      <button 
-                        onClick={() => setGraphRange("last")}
-                        className={cn("px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all", graphRange === "last" ? "bg-white text-zinc-950 shadow-sm" : "text-zinc-400 hover:text-zinc-600")}
-                      >
-                        Previous
-                      </button>
-                    </div>
-                 </div>
-                 <div className="h-[280px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={weeklyData}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f1f1" />
-                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#a1a1aa' }} dy={10} />
-                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#a1a1aa' }} />
-                        <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.05)', fontSize: '11px', fontWeight: 800 }} />
-                        <Line type="monotone" dataKey="assigned" name="Assigned" stroke="#18181b" strokeWidth={3} dot={{ r: 4, fill: '#18181b', strokeWidth: 2, stroke: '#fff' }} />
-                        <Line type="monotone" dataKey="completed" name="Completed" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                 </div>
-              </div>
-
-              {/* TEAM DIRECTORY QUICK NAV */}
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-[32px] p-8 shadow-sm">
-                 <h2 className="text-[11px] font-black text-zinc-900 dark:text-zinc-50 uppercase tracking-[0.3em] mb-6">Team Resource Nodes</h2>
-                 <div className="flex flex-wrap gap-3">
-                    {user?.team && (
-                      <Link 
-                        to={`/admin/tasks?department=${user.team}`}
-                        className="flex items-center gap-4 bg-zinc-950 text-white transition-all px-6 py-4 rounded-2xl shadow-xl group"
-                      >
-                        <div className="flex flex-col">
-                          <span className="text-[10px] font-black uppercase tracking-[0.2em]">{user.team} Command</span>
-                          <span className="text-[9px] font-bold opacity-60">View all team tasks</span>
-                        </div>
-                        <ArrowUpRight className="h-5 w-5" />
-                      </Link>
-                    )}
-                    <Link 
-                      to="/admin/users"
-                      className="flex items-center gap-4 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 transition-all px-6 py-4 rounded-2xl border border-zinc-100 dark:border-zinc-700 group"
-                    >
-                      <div className="flex flex-col">
-                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-900 dark:text-zinc-50">Manage Team</span>
-                        <span className="text-[9px] font-bold text-zinc-400">Directory Oversight</span>
+           <div className="grid gap-6">
+              {recentLogs.length > 0 ? recentLogs.map((log, i) => (
+                <div key={i} className="flex items-center justify-between p-6 rounded-3xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 group hover:border-zinc-200 transition-all">
+                   <div className="flex items-center gap-6">
+                      <div className={cn("h-12 w-12 rounded-2xl flex items-center justify-center shadow-sm", 
+                        log.status === 'completed' ? 'bg-emerald-50 text-emerald-500' : 
+                        log.status === 'in_progress' ? 'bg-blue-50 text-blue-500' : 'bg-amber-50 text-amber-500'
+                      )}>
+                         {log.status === 'completed' ? <CheckCircle2 className="h-5 w-5" /> : <Clock className="h-5 w-5" />}
                       </div>
-                      <Users className="h-4 w-4 text-zinc-400" />
-                    </Link>
-                 </div>
-              </div>
+                      <div>
+                         <p className="text-[13px] font-black text-zinc-900 dark:text-zinc-50">{log.title}</p>
+                         <p className="text-[10px] font-bold text-zinc-400 uppercase mt-1 tracking-wider">
+                           {log.assignmentTitle} • {log.assignedToName || 'Unassigned'}
+                         </p>
+                      </div>
+                   </div>
+                   <div className="text-right">
+                      <p className="text-[10px] font-black text-zinc-900 dark:text-zinc-50 uppercase tracking-tighter">
+                        {new Date(log.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                      <p className="text-[9px] font-bold text-zinc-400 uppercase mt-1">
+                        {new Date(log.updatedAt).toLocaleDateString()}
+                      </p>
+                   </div>
+                </div>
+              )) : (
+                <div className="py-20 text-center border-2 border-dashed border-zinc-100 rounded-[32px]">
+                   <ClipboardList className="h-10 w-10 text-zinc-100 mx-auto mb-4" />
+                   <p className="text-[11px] font-black text-zinc-400 uppercase tracking-widest">No recent task activity recorded</p>
+                </div>
+              )}
            </div>
-
-           <div className="lg:col-span-4 space-y-8">
-              {/* MEMBER PERFORMANCE */}
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-[32px] p-8 shadow-sm">
-                 <h2 className="text-[11px] font-black text-zinc-900 dark:text-zinc-50 uppercase tracking-[0.3em] mb-8">Personnel Efficiency</h2>
-                 <div className="space-y-8">
-                    {memberPerformance.map((mem, i) => (
-                      <div key={i} className="space-y-3">
-                        <div className="flex items-center justify-between">
-                           <div className="flex items-center gap-4">
-                              <Avatar className="h-10 w-10 border-2 border-zinc-50 shadow-sm">
-                                 <AvatarFallback className="bg-zinc-50 text-[10px] font-black text-zinc-400 uppercase">
-                                   {mem.name.split(" ").map((n:any)=>n[0]).join("")}
-                                 </AvatarFallback>
-                              </Avatar>
-                              <div className="min-w-0">
-                                 <p className="text-[13px] font-black text-zinc-900 truncate leading-none">{mem.name}</p>
-                                 <p className="text-[9px] font-bold text-zinc-400 uppercase mt-1.5">{mem.assigned} Assignments</p>
-                              </div>
-                           </div>
-                           <span className="text-xs font-black tabular-nums">{mem.progress}%</span>
-                        </div>
-                        <div className="h-1.5 w-full bg-zinc-50 dark:bg-zinc-800 rounded-full overflow-hidden border border-zinc-100/50">
-                           <div className="h-full bg-emerald-500 transition-all duration-1000 shadow-[0_0_10px_rgba(16,185,129,0.3)]" style={{ width: `${mem.progress}%` }} />
-                        </div>
-                      </div>
-                    ))}
-                 </div>
-              </div>
-
-              {/* RECENT ACTIONS */}
-              <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-8 rounded-[40px] relative overflow-hidden">
-                 <div className="absolute top-0 right-0 p-8 opacity-10">
-                    <Target className="h-32 w-32" />
-                 </div>
-                 <h2 className="text-[11px] font-black text-zinc-900 dark:text-zinc-50 uppercase tracking-[0.3em] mb-8 relative z-10">Recent Operations</h2>
-                 <div className="space-y-6 relative z-10">
-                    {allTasks.slice(0, 4).map((t, i) => (
-                      <div key={i} className="bg-white dark:bg-zinc-950 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm group hover:border-zinc-900 transition-all">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <p className="text-[12px] font-black text-zinc-900 dark:text-zinc-50 truncate pr-4">{t.title}</p>
-                          <span className={cn("h-2 w-2 rounded-full", t.status === 'completed' ? "bg-emerald-500" : "bg-blue-500")} />
-                        </div>
-                        <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-tighter">Assigned To: {t.assignedTo?.name}</p>
-                      </div>
-                    ))}
-                 </div>
-              </div>
-           </div>
-
         </div>
-      </motion.div>
+
+      </div>
     </AppShell>
   );
 }
