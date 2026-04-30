@@ -103,7 +103,7 @@ async function logActivity(
   data: {
     userId: string;
     action: string;
-    resourceType: "worklog" | "user" | "system";
+    resourceType: "worklog" | "user" | "system" | "task" | "assignment";
     resourceId?: string;
     details?: Record<string, unknown>;
   }

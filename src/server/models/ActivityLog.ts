@@ -3,7 +3,7 @@ import mongoose, { Document, Model, Schema } from "mongoose";
 export interface IActivityLog extends Document {
   userId: mongoose.Types.ObjectId;
   action: string;
-  resourceType: "worklog" | "user" | "system" | "task";
+  resourceType: "worklog" | "user" | "system" | "task" | "assignment";
   resourceId?: string;
   details?: Record<string, unknown>;
   ipAddress?: string;
@@ -41,7 +41,7 @@ const activityLogSchema = new Schema<IActivityLog>(
     },
     resourceType: {
       type: String,
-      enum: ["worklog", "user", "system", "task"],
+      enum: ["worklog", "user", "system", "task", "assignment"],
       required: true,
     },
     resourceId: String,
