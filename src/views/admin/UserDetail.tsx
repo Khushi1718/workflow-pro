@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/StatCard";
 import { ArrowLeft, CheckCircle2, Clock, FileText, UserMinus, UserCheck, Loader2, Layers, Calendar, Users } from "lucide-react";
-import { admin, tasks } from "@/lib/api";
+import { admin, tasks, auth } from "@/lib/api";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
