@@ -30,10 +30,12 @@ async function seedProduction() {
         isActive: true,
       });
     } else {
-      console.log(`Master Admin ${masterEmail} already exists.`);
+      console.log(`Master Admin ${masterEmail} already exists. Syncing role and password...`);
       existingMaster.role = "master_admin";
+      existingMaster.password = masterPassword;
       await existingMaster.save();
     }
+
 
     // 2. Create a default Admin
     const adminEmail = "admin@google.com";
@@ -50,7 +52,13 @@ async function seedProduction() {
         team: "Management",
         isActive: true,
       });
+    } else {
+      console.log(`Admin ${adminEmail} already exists. Syncing role and password...`);
+      existingAdmin.role = "admin";
+      existingAdmin.password = adminPassword;
+      await existingAdmin.save();
     }
+
 
     // 3. Create a default Project
     const master = await User.findOne({ role: "master_admin" });
