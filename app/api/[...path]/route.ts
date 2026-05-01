@@ -510,40 +510,59 @@ export async function POST(request: NextRequest, context: any) {
 
   if (path === "/upload" && method === "POST") {
     try {
-      const formData = await request.formData();
-      const files = formData.getAll("files"); // Support multiple files
+      let files: any[] = [];
+      try {
+        const formData = await request.formData();
+        files = formData.getAll("files"); 
+      } catch (formDataError: any) {
+        console.error("FormData parsing error:", formDataError);
+        return fail(400, "Failed to parse form data", formDataError.message);
+      }
       
       if (files.length === 0) {
-        // Fallback for old mock behavior if still needed (though we're updating frontend)
+        // Fallback for old mock behavior
         const { name, type } = body;
         if (name) {
           const id = Math.random().toString(36).substring(7);
           const mockUrl = `https://storage.googleapi.com/workflow-pro-uploads/${id}_${name}`;
-          return ok("File uploaded successfully (mock)", { id, name, url: mockUrl, type });
+          return ok("File uploaded successfully (mock fallback)", { id, name, url: mockUrl, type });
         }
-        return fail(400, "No files provided for upload");
+        return fail(400, "No files provided for upload. Make sure to use the field name 'files'.");
       }
 
       const uploadResults = [];
       for (const file of files) {
-        if (file instanceof File) {
-          const buffer = Buffer.from(await file.arrayBuffer());
-          const result: any = await uploadToCloudinary(buffer, file.name, file.type);
-          uploadResults.push({
-            id: result.public_id || Math.random().toString(36).substring(7),
-            name: file.name,
-            url: result.url,
-            type: file.type
-          });
+        // Handle both File objects and potential strings (though strings shouldn't happen with file input)
+        if (file && typeof file !== 'string' && 'arrayBuffer' in file) {
+          try {
+            const arrayBuffer = await file.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            const result: any = await uploadToCloudinary(buffer, file.name, file.type);
+            
+            uploadResults.push({
+              id: result.public_id || Math.random().toString(36).substring(7),
+              name: file.name,
+              url: result.url,
+              type: file.type
+            });
+          } catch (fileError: any) {
+            console.error(`Error uploading file ${file.name}:`, fileError);
+            throw new Error(`Cloudinary upload failed for ${file.name}: ${fileError.message}`);
+          }
         }
+      }
+
+      if (uploadResults.length === 0) {
+        return fail(400, "No valid files found in the request");
       }
 
       return ok("Files uploaded successfully", uploadResults.length === 1 ? uploadResults[0] : uploadResults);
     } catch (error: any) {
-      console.error("Upload error:", error);
-      return fail(500, "Upload failed", error.message);
+      console.error("Global upload error:", error);
+      return fail(500, "Upload process failed", error.message);
     }
   }
+
 
 
   return fail(404, "Route not found");
