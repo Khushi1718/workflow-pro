@@ -37,7 +37,8 @@ import {
 } from "lucide-react";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { toast } from "sonner";
-import { auth, workLogs } from "@/lib/api";
+import { auth, workLogs, files as fileApi } from "@/lib/api";
+
 import { Task, LogStatus, LogState, WorkLogAttachment, SeoData } from "@/lib/mock-data";
 
 type WorkLogFormData = {
@@ -242,19 +243,32 @@ export default function AddLog() {
     setLinkInput("");
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (isLocked) return;
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const newAtt: WorkLogAttachment = {
-      id: `att_${Date.now()}`,
-      name: file.name,
-      url: "#",
-      type: file.name.endsWith(".xlsx") ? "spreadsheet" : file.name.endsWith(".pptx") ? "presentation" : "document"
-    };
-    setFormData(prev => ({ ...prev, attachments: [...(prev.attachments || []), newAtt] }));
+    try {
+      setIsLoading(true);
+      const res = await fileApi.upload(file);
+      if (res.success) {
+        const newAtt: WorkLogAttachment = {
+          id: res.data.id || `att_${Date.now()}`,
+          name: res.data.name || file.name,
+          url: res.data.url,
+          type: file.name.endsWith(".xlsx") ? "spreadsheet" : file.name.endsWith(".pptx") ? "presentation" : "document"
+        };
+        setFormData(prev => ({ ...prev, attachments: [...(prev.attachments || []), newAtt] }));
+        toast.success("File uploaded successfully");
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast.error("Failed to upload file");
+    } finally {
+      setIsLoading(false);
+    }
   };
+
 
   const updateAttachment = (attachmentId: string, field: keyof WorkLogAttachment, value: string) => {
     if (isLocked) return;

@@ -31,7 +31,8 @@ import {
   ChevronDown,
   ChevronUp
 } from "lucide-react";
-import { tasks, apiRequest } from "@/lib/api";
+import { tasks, apiRequest, files as fileApi } from "@/lib/api";
+
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -116,12 +117,10 @@ export function AssignmentDetails({
       
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const res = await apiRequest("/upload", {
-          method: "POST",
-          body: JSON.stringify({ name: file.name, type: file.type })
-        });
+        const res = await fileApi.upload(file);
         if (res.success) newFiles.push(res.data);
       }
+
       
       setTaskEvidence({
         ...taskEvidence,

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useParams } from "@/lib/router";
+import { Link, useParams, useLocation } from "@/lib/router";
 import { AppShell } from "@/components/AppShell";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -23,9 +23,10 @@ import {
   Unlock,
   ClipboardList,
   Briefcase,
-  X
+  X,
+  Zap
 } from "lucide-react";
-import { admin, tasks, auth } from "@/lib/api";
+import { admin, tasks, auth, projects } from "@/lib/api";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -42,6 +43,7 @@ import { AssignmentDetails } from "@/components/AssignmentDetails";
 
 export default function UserDetail() {
   const { id } = useParams();
+  const location = useLocation();
   const [u, setU] = useState<any>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [userAssignments, setUserAssignments] = useState<any[]>([]);
@@ -61,10 +63,13 @@ export default function UserDetail() {
     const fetchData = async () => {
       try {
         if (!id) return;
+        const params = new URLSearchParams(location.search);
+        const pId = params.get("projectId");
+
         const [userRes, profileRes, assignmentsRes] = await Promise.all([
           admin.getUserDetail(id),
           auth.getProfile(),
-          tasks.getAll("all")
+          tasks.getAll("all", undefined, undefined, undefined, undefined, pId || undefined)
         ]);
 
         if (userRes.success) setU(userRes.data);
@@ -83,7 +88,7 @@ export default function UserDetail() {
       }
     };
     fetchData();
-  }, [id]);
+  }, [id, location.search]);
 
   const fetchAssignmentTasks = async (assignmentId: string) => {
     try {
@@ -142,172 +147,203 @@ export default function UserDetail() {
     pending: userAssignments.filter(a => a.progress < 100).length
   };
 
+  const [allProjects, setAllProjects] = useState<any[]>([]);
+  const [projectFilter, setProjectFilter] = useState("all");
+
+  useEffect(() => {
+    const fetchProjects = async () => {
+      const res = await projects.getAll();
+      if (res.success) setAllProjects(res.data || []);
+    };
+    fetchProjects();
+  }, []);
+
   const basePath = currentUser?.role === "master_admin" ? "/master-admin" : "/admin";
 
   return (
     <AppShell role={currentUser?.role || "admin"} title="User Details">
       <div className="max-w-[1200px] mx-auto px-6 py-8 space-y-10 animate-in fade-in slide-in-from-bottom-2 duration-500 pb-20">
         
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-8 border-b border-zinc-100 dark:border-zinc-900 pb-10">
-           <div className="flex items-center gap-6">
-              <Avatar className="h-16 w-16 border border-zinc-200 shadow-sm">
-                 <AvatarFallback className="bg-zinc-50 dark:bg-zinc-900 text-zinc-400 text-xl font-bold uppercase">
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-zinc-100 pb-8">
+           <div className="flex items-center gap-5">
+              <Avatar className="h-14 w-14 rounded-xl border border-zinc-200">
+                 <AvatarFallback className="bg-zinc-50 text-zinc-600 text-lg font-bold uppercase">
                     {u?.name?.split(" ").map((n:any)=>n[0]).join("")}
                  </AvatarFallback>
               </Avatar>
-              <div>
-                 <div className="flex items-center gap-3">
-                    <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">{u?.name}</h1>
-                    <Badge variant="outline" className={cn(
-                      "text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded",
-                      u?.isActive ? "bg-emerald-50 text-emerald-600 border-emerald-200/50" : "bg-rose-50 text-rose-600 border-rose-200/50"
+              <div className="space-y-1.5">
+                 <div className="flex items-center gap-4">
+                    <h1 className="text-2xl font-bold tracking-tight text-zinc-900">{u?.name}</h1>
+                    <span className={cn(
+                      "px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest",
+                      u?.isActive ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-rose-50 text-rose-600 border border-rose-100"
                     )}>
-                       {u?.isActive ? "Active User" : "Access Revoked"}
-                    </Badge>
+                       {u?.isActive ? "Active Account" : "Access Restricted"}
+                    </span>
                  </div>
-                 <div className="flex items-center gap-4 mt-1.5 text-[11px] font-medium text-zinc-400 uppercase tracking-tighter">
-                    <span className="flex items-center gap-1.5"><Briefcase className="h-3 w-3" /> {u?.team}</span>
-                    <span className="h-1 w-1 rounded-full bg-zinc-200" />
-                    <span className="flex items-center gap-1.5"><Calendar className="h-3 w-3" /> Joined {u && new Date(u.joinedAt || u.createdAt).toLocaleDateString()}</span>
+                 <div className="flex items-center gap-4 text-xs font-semibold text-zinc-700 uppercase tracking-tight">
+                    <span className="flex items-center gap-2"><Briefcase className="h-3.5 w-3.5 text-zinc-500" /> {u?.team}</span>
+                    <span className="h-1.5 w-1.5 rounded-full bg-zinc-300" />
+                    <span className="flex items-center gap-1.5">Reference ID: {u?._id?.slice(-8)}</span>
                  </div>
               </div>
            </div>
-           <div className="flex items-center gap-3">
-              <Button asChild variant="outline" className="h-9 px-4 rounded-md border-zinc-200 text-[10px] font-bold uppercase tracking-widest hover:bg-zinc-50">
+           <div className="flex items-center gap-2">
+              <Button asChild variant="ghost" className="h-9 px-4 rounded-lg text-[10px] font-bold uppercase tracking-wider text-zinc-600 hover:text-blue-600">
                  <Link to={`${basePath}/users`}><ArrowLeft className="mr-2 h-3.5 w-3.5" /> Back</Link>
               </Button>
               <Button 
-                variant={u?.isActive ? "destructive" : "outline"}
-                className="h-9 px-4 rounded-md text-[10px] font-bold uppercase tracking-widest shadow-md"
+                variant="outline"
+                className={cn(
+                  "h-9 px-4 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all",
+                  u?.isActive ? "border-rose-100 text-rose-500 hover:bg-rose-50" : "border-blue-100 text-blue-600 hover:bg-blue-50"
+                )}
                 onClick={toggleStatus}
               >
                  {u?.isActive ? <Lock className="mr-2 h-3.5 w-3.5" /> : <Unlock className="mr-2 h-3.5 w-3.5" />}
-                 {u?.isActive ? "Revoke Access" : "Restore Access"}
+                 {u?.isActive ? "Revoke Access" : "Grant Access"}
               </Button>
            </div>
         </header>
 
         {/* METRICS */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
            {[
-             { label: "Total Tasks", value: stats.total, icon: ClipboardList, color: "text-zinc-400" },
-             { label: "Completed Tasks", value: stats.completed, icon: CheckCircle2, color: "text-emerald-500" },
-             { label: "Pending Tasks", value: stats.pending, icon: Clock, color: "text-amber-500" },
+             { label: "Total Assignments", value: stats.total, icon: ClipboardList, color: "text-zinc-600" },
+             { label: "Completed", value: stats.completed, icon: CheckCircle2, color: "text-emerald-500" },
+             { label: "Pending", value: stats.pending, icon: Clock, color: "text-amber-500" },
            ].map((s, i) => (
-             <div key={i} className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 p-6 rounded-xl shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                   <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{s.label}</p>
-                   <s.icon className={cn("h-4 w-4", s.color)} />
+             <div key={i} className="bg-white border border-zinc-100 p-7 rounded-2xl shadow-sm flex items-center justify-between group hover:border-zinc-200 transition-all">
+                <div>
+                 <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-2">{s.label}</p>
+                   <h3 className="text-3xl font-bold tracking-tight text-zinc-900">{s.value}</h3>
                 </div>
-                <h3 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">{s.value}</h3>
+                <div className={cn("h-11 w-11 rounded-xl flex items-center justify-center bg-zinc-50 shadow-inner group-hover:scale-110 transition-transform", s.color)}>
+                   <s.icon className="h-5 w-5" />
+                </div>
              </div>
            ))}
         </div>
 
         {/* TASK HISTORY SECTION */}
-        <section className="space-y-6">
-           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-100 dark:border-zinc-900 pb-6">
-              <h2 className="text-[11px] font-bold text-zinc-900 dark:text-zinc-50 uppercase tracking-[0.3em] flex items-center gap-2">
-                 <Layers className="h-4 w-4 text-zinc-400" /> Task History
+        <section className="space-y-4">
+           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 border-b border-zinc-100 pb-5">
+              <h2 className="text-xs font-bold text-zinc-900 uppercase tracking-[0.2em] flex items-center gap-3">
+                <div className="h-4 w-1 bg-zinc-900 rounded-full" /> Assignment History
               </h2>
-              <div className="flex flex-wrap items-center gap-4">
-                 <div className="flex items-center gap-2 px-3 h-8 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
-                    <Calendar className="h-3.5 w-3.5 text-zinc-400" />
+              <div className="flex flex-wrap items-center gap-3">
+                 <div className="flex items-center gap-2 px-3 h-9 rounded-lg border border-zinc-100 bg-white">
+                    <Calendar className="h-3.5 w-3.5 text-zinc-600" />
                     <input 
                       type="date" 
                       value={customDate}
                       onChange={(e) => { setCustomDate(e.target.value); setCurrentPage(1); }}
-                      className="bg-transparent border-none text-[10px] font-bold uppercase outline-none focus:ring-0 w-24"
+                      className="bg-transparent border-none text-[10px] font-bold uppercase outline-none focus:ring-0 w-24 text-zinc-700"
                     />
                     {customDate && (
-                      <button onClick={() => setCustomDate("")} className="text-zinc-400 hover:text-rose-500">
+                      <button onClick={() => setCustomDate("")} className="text-zinc-500 hover:text-rose-500">
                          <X className="h-3 w-3" />
                       </button>
                     )}
                  </div>
 
-                 <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
-                    <Filter className="h-3.5 w-3.5" />
-                 </div>
+                 <Select value={projectFilter} onValueChange={(v) => { setProjectFilter(v); setCurrentPage(1); }}>
+                    <SelectTrigger className="h-9 w-[150px] rounded-lg bg-zinc-50 border-none text-[10px] font-bold uppercase tracking-wider">
+                       <SelectValue placeholder="All Projects" />
+                    </SelectTrigger>
+                    <SelectContent>
+                       <SelectItem value="all" className="text-[10px] font-bold uppercase">All Projects</SelectItem>
+                       {allProjects.map(p => (
+                         <SelectItem key={p._id} value={p._id} className="text-[10px] font-bold uppercase">{p.name}</SelectItem>
+                       ))}
+                    </SelectContent>
+                 </Select>
+
                  <Select value={dateFilter} onValueChange={(v) => { setDateFilter(v); setCustomDate(""); setCurrentPage(1); }}>
-                    <SelectTrigger className="h-8 w-[140px] rounded-md bg-zinc-50 border-zinc-200 text-[10px] font-bold uppercase tracking-wider">
+                    <SelectTrigger className="h-9 w-[120px] rounded-lg bg-zinc-50 border-none text-[10px] font-bold uppercase tracking-wider">
                        <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="rounded-lg border-zinc-200">
-                       <SelectItem value="all" className="text-[10px] font-bold">All History</SelectItem>
-                       <SelectItem value="today" className="text-[10px] font-bold">Today Only</SelectItem>
-                       <SelectItem value="7days" className="text-[10px] font-bold">Last 7 Days</SelectItem>
+                    <SelectContent>
+                       <SelectItem value="all" className="text-[10px] font-bold uppercase">All Time</SelectItem>
+                       <SelectItem value="today" className="text-[10px] font-bold uppercase">Today</SelectItem>
+                       <SelectItem value="7days" className="text-[10px] font-bold uppercase">Last 7 Days</SelectItem>
                     </SelectContent>
                  </Select>
               </div>
            </div>
 
-           <div className="space-y-3">
-              {paginatedTasks.length > 0 ? paginatedTasks.map((a: any) => (
-                 <div key={a._id} className="group flex items-center justify-between p-5 rounded-lg bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 transition-all shadow-sm">
-                    <div className="flex items-center gap-5 flex-1 min-w-0">
-                       <div className="h-10 w-10 rounded-md bg-zinc-50 dark:bg-zinc-800 flex items-center justify-center text-zinc-300 group-hover:bg-zinc-900 group-hover:text-white transition-all">
-                          <FileText className="h-5 w-5" />
-                       </div>
-                       <div className="min-w-0 flex-1">
-                          <h4 className="text-[13px] font-bold text-zinc-900 dark:text-zinc-50 truncate group-hover:text-zinc-600 transition-colors">{a.title}</h4>
-                          <div className="flex items-center gap-4 text-[10px] text-zinc-400 font-medium uppercase tracking-tighter mt-1">
-                             <span className="flex items-center gap-1.5">Assigned by {a.assignedBy?.name || "System"}</span>
-                             <span className="h-1 w-1 rounded-full bg-zinc-200" />
-                             <span className="flex items-center gap-1.5"><Calendar className="h-3 w-3" /> {new Date(a.createdAt).toLocaleDateString()}</span>
-                          </div>
-                       </div>
-                    </div>
-                    <div className="flex items-center gap-8 ml-6">
-                        <div className="flex items-center gap-6">
-                           <div className="text-right hidden sm:block">
-                              <p className="text-[11px] font-bold text-zinc-900 dark:text-zinc-50">{Math.round(a.progress)}%</p>
-                              <p className="text-[8px] font-bold text-zinc-400 uppercase tracking-tighter">Progress</p>
+            <div className="space-y-2">
+               {paginatedTasks
+                 .filter(a => projectFilter === "all" || a.projectId === projectFilter)
+                 .length > 0 ? paginatedTasks
+                 .filter(a => projectFilter === "all" || a.projectId === projectFilter)
+                 .map((a: any) => (
+                  <div key={a._id} className="group flex items-center justify-between p-6 rounded-2xl bg-white border border-zinc-100 hover:border-zinc-200 transition-all shadow-sm">
+                     <div className="flex items-center gap-6 flex-1 min-w-0">
+                        <div className="h-12 w-12 rounded-xl bg-zinc-50 flex items-center justify-center text-zinc-600 group-hover:bg-zinc-900 group-hover:text-white transition-all shadow-sm">
+                           <FileText className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                           <h4 className="text-[15px] font-semibold text-zinc-900 tracking-tight">{a.title}</h4>
+                           <div className="flex items-center gap-4 text-xs text-zinc-600 font-medium uppercase tracking-tight mt-1.5">
+                              <span className="flex items-center gap-2">Lead: {a.assignedBy?.name || "System"}</span>
+                              <span className="h-1 w-1 rounded-full bg-zinc-300" />
+                              <span className="flex items-center gap-2 uppercase tracking-widest text-[10px] font-bold text-zinc-500">{new Date(a.createdAt).toLocaleDateString()}</span>
                            </div>
-                           <div className="h-1.5 w-24 bg-zinc-50 dark:bg-zinc-800 rounded-full overflow-hidden">
-                              <div className="h-full bg-zinc-900 dark:bg-zinc-50 transition-all duration-1000" style={{ width: `${a.progress}%` }} />
+                        </div>
+                     </div>
+                     <div className="flex items-center gap-8 ml-6">
+                        <div className="hidden sm:flex flex-col items-end gap-2">
+                           <p className="text-xs font-bold text-zinc-900">{Math.round(a.progress)}%</p>
+                           <div className="h-1.5 w-24 bg-zinc-50 rounded-full overflow-hidden shadow-inner">
+                              <div className="h-full bg-zinc-900 transition-all duration-1000" style={{ width: `${a.progress}%` }} />
                            </div>
                         </div>
                         <Button 
                           variant="outline" 
-                          size="sm" 
-                          className="h-8 rounded-md text-[10px] font-bold uppercase tracking-widest px-3 border-zinc-200 hover:bg-zinc-900 hover:text-white transition-all group-hover:border-zinc-900"
+                          size="sm"
+                          className="h-10 px-5 rounded-xl text-[10px] font-bold uppercase tracking-widest border-zinc-200 text-zinc-700 hover:bg-zinc-900 hover:text-white transition-all"
                           onClick={() => { setSelectedAssignment(a); fetchAssignmentTasks(a._id); setIsModalOpen(true); }}
                         >
-                           View Bundle
+                           View Details
                         </Button>
                      </div>
-                 </div>
-              )) : (
-                 <div className="py-20 text-center border border-dashed border-zinc-100 rounded-xl">
-                    <ShieldAlert className="h-10 w-10 text-zinc-100 mx-auto mb-4" />
-                    <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.2em]">No tasks found for this date segment</p>
-                 </div>
-              )}
-           </div>
+                  </div>
+               )) : (
+                  <div className="py-16 text-center border border-dashed border-zinc-100 rounded-2xl bg-zinc-50/30">
+                     <ShieldAlert className="h-8 w-8 text-zinc-200 mx-auto mb-4" />
+                     <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">No matching history</p>
+                  </div>
+               )}
+            </div>
 
-           {/* PAGINATION CONTROLS */}
-           {totalPages > 1 && (
-              <div className="flex items-center justify-between pt-6">
-                 <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Page {currentPage} of {totalPages}</p>
-                 <div className="flex gap-2">
+            {/* PAGINATION CONTROLS */}
+            {filteredTasks.length > 0 && (
+               <div className="flex items-center justify-between pt-8 border-t border-zinc-50">
+                 <div className="flex items-center gap-4">
+                    <p className="text-[11px] font-bold text-zinc-600 uppercase tracking-widest">
+                       Page <span className="text-zinc-900">{currentPage}</span> of <span className="text-zinc-900">{totalPages}</span>
+                    </p>
+                 </div>
+                 <div className="flex items-center gap-1">
                     <Button 
-                      variant="outline" 
-                      size="icon" 
-                      className="h-8 w-8 rounded-md border-zinc-200 disabled:opacity-30" 
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-9 px-4 rounded-xl text-[10px] font-bold uppercase tracking-widest text-zinc-700 disabled:opacity-40 hover:bg-zinc-50 transition-all"
+                      onClick={() => { setCurrentPage(prev => Math.max(1, prev - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                       disabled={currentPage === 1}
                     >
-                       <ChevronLeft className="h-4 w-4" />
+                       <ChevronLeft className="mr-2 h-4 w-4" /> Previous
                     </Button>
+                    <div className="h-4 w-[1px] bg-zinc-100 mx-2" />
                     <Button 
-                      variant="outline" 
-                      size="icon" 
-                      className="h-8 w-8 rounded-md border-zinc-200 disabled:opacity-30" 
-                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-9 px-4 rounded-xl text-[10px] font-bold uppercase tracking-widest text-zinc-700 disabled:opacity-40 hover:bg-zinc-50 transition-all"
+                      onClick={() => { setCurrentPage(prev => Math.min(totalPages, prev + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                       disabled={currentPage === totalPages}
                     >
-                       <ChevronRight className="h-4 w-4" />
+                       Next <ChevronRight className="ml-2 h-4 w-4" />
                     </Button>
                  </div>
               </div>

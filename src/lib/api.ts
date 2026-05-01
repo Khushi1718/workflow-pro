@@ -38,7 +38,10 @@ export const apiRequest = async <T = any,>(
   const token = getAuthToken();
 
   const headers = new Headers(options.headers);
-  headers.set("Content-Type", "application/json");
+  if (!(options.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
+  }
+
 
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
@@ -306,6 +309,34 @@ export const notifications = {
     });
   },
 };
+
+
+// ===== PROJECTS API =====
+export const projects = {
+  getAll: async () => {
+    return apiRequest<any[]>("/projects");
+  },
+  getById: async (id: string) => {
+    return apiRequest<any>(`/projects/${id}`);
+  },
+  create: async (data: { name: string; description: string; clientName?: string; members?: string[] }) => {
+    return apiRequest("/projects", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+  update: async (id: string, data: any) => {
+    return apiRequest(`/projects/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  },
+  delete: async (id: string) => {
+    return apiRequest(`/projects/${id}`, {
+      method: "DELETE",
+    });
+  },
+};
 // ===== TASKS & ASSIGNMENTS API =====
 export const tasks = {
   create: async (data: {
@@ -320,13 +351,14 @@ export const tasks = {
     });
   },
 
-  getAll: async (type: "assigned_to_me" | "assigned_by_me" | "all" = "assigned_to_me", status?: string, q?: string, date?: string, department?: string) => {
+  getAll: async (type: "assigned_to_me" | "assigned_by_me" | "all" = "assigned_to_me", status?: string, q?: string, date?: string, department?: string, projectId?: string) => {
     const params = new URLSearchParams();
     params.append("type", type);
     if (status) params.append("status", status);
     if (q) params.append("q", q);
     if (date) params.append("date", date);
     if (department) params.append("department", department);
+    if (projectId) params.append("projectId", projectId);
     return apiRequest(`/tasks?${params.toString()}`);
   },
 
@@ -360,5 +392,21 @@ export const tasks = {
 export const masterAdmin = {
   getStats: async () => {
     return apiRequest("/master-admin/stats");
+  },
+};
+// ===== FILE UPLOAD API =====
+export const files = {
+  upload: async (file: File | File[]) => {
+    const formData = new FormData();
+    if (Array.isArray(file)) {
+      file.forEach((f) => formData.append("files", f));
+    } else {
+      formData.append("files", file);
+    }
+
+    return apiRequest("/upload", {
+      method: "POST",
+      body: formData,
+    });
   },
 };

@@ -8,7 +8,10 @@ import Message from "@/server/models/Message";
 import Notification from "@/server/models/Notification";
 import Task from "@/server/models/Task";
 import Assignment from "@/server/models/Assignment";
+import Project from "@/server/models/Project";
 import { generateToken, verifyToken, type JWTPayload } from "@/server/jwt";
+import { uploadToCloudinary } from "@/server/cloudinary";
+
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -144,11 +147,16 @@ export async function POST(request: NextRequest, context: any) {
     
     // Defensive body reading
     let body: any = {};
-    try {
-      body = await request.json();
-    } catch (e) {
-      console.warn("Could not parse JSON body, using empty object");
+    const contentType = request.headers.get("content-type") || "";
+    
+    if (contentType.includes("application/json")) {
+      try {
+        body = await request.json();
+      } catch (e) {
+        console.warn("Could not parse JSON body, using empty object");
+      }
     }
+
 
     // --- TASK MANAGEMENT (PRIORITY) ---
     if (path === "/tasks") {
@@ -157,7 +165,7 @@ export async function POST(request: NextRequest, context: any) {
 
       if (method === "POST" && (auth.user.role === "master_admin" || auth.user.role === "admin")) {
         try {
-          const { assignedTo, title, tasks: tasksData } = body;
+          const { assignedTo, title, tasks: tasksData, projectId } = body;
           
           if (!assignedTo || !title || !tasksData || !Array.isArray(tasksData) || tasksData.length === 0) {
             return fail(400, "Missing required fields: Title, Assignee, and Tasks are required.");
@@ -175,6 +183,7 @@ export async function POST(request: NextRequest, context: any) {
           const assignment = new Assignment({
             assignedBy: new Types.ObjectId(auth.user.userId),
             assignedTo: new Types.ObjectId(assignedTo),
+            projectId: projectId ? new Types.ObjectId(projectId) : undefined,
             title: title.trim(),
             status: "pending",
           });
@@ -235,6 +244,28 @@ export async function POST(request: NextRequest, context: any) {
           return fail(400, `Validation Failed: ${error.message} [Task Schema: ${taskPaths}] [Assignment Schema: ${assignmentPaths}]`);
         }
       }
+    }
+
+    if (path === "/projects") {
+      const auth = requireAuth(request);
+      if (auth.response) return auth.response;
+
+      if (auth.user.role !== "master_admin") return fail(403, "Only Master Admins can create projects");
+      const { name, description, clientName, members } = body;
+      if (!name) return fail(400, "Name is required");
+
+      const project = new Project({
+        name,
+        description: description || "No summary provided.",
+        clientName,
+        members: (members || []).map((m: string) => new Types.ObjectId(m)),
+        createdBy: new Types.ObjectId(auth.user.userId),
+      });
+      if (project.members.length === 0) {
+        project.members.push(new Types.ObjectId(auth.user.userId));
+      }
+      await project.save();
+      return ok("Project created successfully", project, 201);
     }
 
   if (path === "/auth/register") {
@@ -478,11 +509,42 @@ export async function POST(request: NextRequest, context: any) {
 
 
   if (path === "/upload" && method === "POST") {
-    const { name, type } = body;
-    const id = Math.random().toString(36).substring(7);
-    const mockUrl = `https://storage.googleapi.com/workflow-pro-uploads/${id}_${name}`;
-    return ok("File uploaded successfully", { id, name, url: mockUrl, type });
+    try {
+      const formData = await request.formData();
+      const files = formData.getAll("files"); // Support multiple files
+      
+      if (files.length === 0) {
+        // Fallback for old mock behavior if still needed (though we're updating frontend)
+        const { name, type } = body;
+        if (name) {
+          const id = Math.random().toString(36).substring(7);
+          const mockUrl = `https://storage.googleapi.com/workflow-pro-uploads/${id}_${name}`;
+          return ok("File uploaded successfully (mock)", { id, name, url: mockUrl, type });
+        }
+        return fail(400, "No files provided for upload");
+      }
+
+      const uploadResults = [];
+      for (const file of files) {
+        if (file instanceof File) {
+          const buffer = Buffer.from(await file.arrayBuffer());
+          const result: any = await uploadToCloudinary(buffer, file.name, file.type);
+          uploadResults.push({
+            id: result.public_id || Math.random().toString(36).substring(7),
+            name: file.name,
+            url: result.url,
+            type: file.type
+          });
+        }
+      }
+
+      return ok("Files uploaded successfully", uploadResults.length === 1 ? uploadResults[0] : uploadResults);
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      return fail(500, "Upload failed", error.message);
+    }
   }
+
 
   return fail(404, "Route not found");
   } catch (error: any) {
@@ -496,6 +558,7 @@ export async function GET(request: NextRequest, context: Context) {
     await connectDB();
     const path = getPath(context);
     const query = getQuery(request);
+    const method = request.method;
 
   if (path === "/auth/profile") {
     const auth = requireAuth(request);
@@ -514,6 +577,40 @@ export async function GET(request: NextRequest, context: Context) {
       joinedAt: user.joinedAt,
     });
   }
+
+  if (path === "/projects") {
+    const auth = requireAuth(request);
+    if (auth.response) return auth.response;
+
+    const filter: any = {};
+    if (auth.user.role !== "master_admin") {
+      filter.members = new Types.ObjectId(auth.user.userId);
+    }
+    const projectsList = await Project.find(filter)
+      .populate("members", "name email role team")
+      .populate("createdBy", "name")
+      .sort({ createdAt: -1 });
+    return ok("Projects retrieved", projectsList);
+  }
+
+  const projectDetailMatch = path.match(/^\/projects\/([^/]+)$/);
+  if (projectDetailMatch) {
+    const auth = requireAuth(request);
+    if (auth.response) return auth.response;
+    const projectId = projectDetailMatch[1];
+
+    const project = await Project.findById(projectId)
+      .populate("members", "name email role team")
+      .populate("createdBy", "name");
+    if (!project) return fail(404, "Project not found");
+    
+    // Check permission
+    if (auth.user.role !== "master_admin" && !project.members.some((m: any) => m._id.toString() === auth.user.userId)) {
+      return fail(403, "Access denied to this project");
+    }
+    return ok("Project retrieved", project);
+  }
+
 
   if (path === "/work-logs/my-logs") {
     const auth = requireAuth(request);
@@ -960,8 +1057,11 @@ export async function GET(request: NextRequest, context: Context) {
     const q = query.get("q");
     const date = query.get("date");
     const department = query.get("department");
+    const projectId = query.get("projectId");
     
     const filter: any = {};
+    if (projectId) filter.projectId = new Types.ObjectId(projectId);
+
     if (type === "assigned_to_me") {
       filter.assignedTo = new Types.ObjectId(auth.user.userId);
     } else if (type === "assigned_by_me") {
@@ -1194,6 +1294,7 @@ export async function PUT(request: NextRequest, context: Context) {
     await connectDB();
     const path = getPath(context);
     const body = await readBody(request);
+    const method = request.method;
 
   if (path === "/auth/profile") {
     const auth = requireAuth(request);
@@ -1242,6 +1343,41 @@ export async function PUT(request: NextRequest, context: Context) {
     });
 
     return ok("Password updated successfully");
+  }
+
+  const projectDetailMatch = path.match(/^\/projects\/([^/]+)$/);
+  if (projectDetailMatch) {
+    const auth = requireAuth(request);
+    if (auth.response) return auth.response;
+    const projectId = projectDetailMatch[1];
+
+    const project = await Project.findById(projectId);
+    if (!project) return fail(404, "Project not found");
+
+    // Permission check: Master Admin OR Admin who is a member
+    const isMember = project.members.some((m: any) => m.toString() === auth.user.userId);
+    const isMaster = auth.user.role === "master_admin";
+    const isAdminMember = auth.user.role === "admin" && isMember;
+
+    if (!isMaster && !isAdminMember) {
+      return fail(403, "You do not have permission to update this project");
+    }
+
+    // Admins can ONLY update members
+    if (isAdminMember && !isMaster) {
+      const { members } = body;
+      if (members) {
+        project.members = members.map((m: string) => new Types.ObjectId(m));
+        await project.save();
+        return ok("Members updated successfully", project);
+      }
+      return fail(400, "Admins can only update the project member list");
+    }
+
+    // Master Admin can update anything
+    Object.assign(project, body);
+    await project.save();
+    return ok("Project updated successfully", project);
   }
 
   const adminStatusMatch = path.match(/^\/admin\/users\/([^/]+)\/status$/);
@@ -1548,6 +1684,7 @@ export async function DELETE(request: NextRequest, context: Context) {
   try {
     await connectDB();
     const path = getPath(context);
+    const method = request.method;
 
   const conversationMatch = path.match(/^\/messages\/conversation\/([^/]+)$/);
   if (conversationMatch) {
@@ -1561,17 +1698,27 @@ export async function DELETE(request: NextRequest, context: Context) {
     const targetUserId = new Types.ObjectId(otherUserId);
 
     await Message.updateMany(
-      {
-        contextType: "direct",
+      { 
         $or: [
-          { senderId: currentUserId, receiverIds: targetUserId },
-          { senderId: targetUserId, receiverIds: currentUserId }
+          { senderId: currentUserId, receiverId: targetUserId },
+          { senderId: targetUserId, receiverId: currentUserId }
         ]
       },
-      { $addToSet: { deletedBy: currentUserId } }
+      { $set: { isDeletedBy: currentUserId } }
     );
 
-    return ok("Conversation hidden for you");
+    return ok("Conversation cleared");
+  }
+
+  const projectDetailMatch = path.match(/^\/projects\/([^/]+)$/);
+  if (projectDetailMatch) {
+    const auth = requireAuth(request);
+    if (auth.response) return auth.response;
+    const projectId = projectDetailMatch[1];
+
+    if (auth.user.role !== "master_admin") return fail(403, "Only Master Admins can delete projects");
+    await Project.findByIdAndDelete(projectId);
+    return ok("Project deleted successfully");
   }
 
   const workLogMatch = path.match(/^\/work-logs\/([^/]+)$/);

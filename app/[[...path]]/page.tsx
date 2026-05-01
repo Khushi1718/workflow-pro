@@ -19,6 +19,8 @@ import ActivityLogs from "@/views/admin/ActivityLogs";
 import AdminProfile from "@/views/admin/Profile";
 import Messaging from "@/views/shared/Messaging";
 import Notifications from "@/views/shared/Notifications";
+import Projects from "@/views/shared/Projects";
+import ProjectDetail from "@/views/shared/ProjectDetail";
 import MasterAdminDashboard from "@/views/master-admin/Dashboard";
 import TaskBoard from "@/views/shared/TaskBoard";
 
@@ -30,6 +32,8 @@ export default function Page() {
 
   // Employee Routes
   if (pathname === "/employee/dashboard") return <EmployeeDashboard />;
+  if (pathname === "/employee/projects") return <Projects role="employee" />;
+  if (pathname.startsWith("/employee/projects/")) return <ProjectDetail role="employee" />;
   if (pathname === "/employee/today") return <TodayLogs />;
   if (pathname === "/employee/tasks") return <AllLogs />;
   if (pathname === "/employee/add-log") return <AddLog />;
@@ -41,6 +45,8 @@ export default function Page() {
 
   // Admin Routes
   if (pathname === "/admin/dashboard") return <AdminDashboard />;
+  if (pathname === "/admin/projects") return <Projects role="admin" />;
+  if (pathname.startsWith("/admin/projects/")) return <ProjectDetail role="admin" />;
   if (pathname === "/admin/tasks") return <AllLogs />;
   if (pathname === "/admin/users") return <AllUsers />;
   if (pathname.startsWith("/admin/users/")) return <UserDetail />;
@@ -55,6 +61,8 @@ export default function Page() {
 
   // Master Admin Routes
   if (pathname === "/master-admin/dashboard") return <MasterAdminDashboard />;
+  if (pathname === "/master-admin/projects") return <Projects role="master_admin" />;
+  if (pathname.startsWith("/master-admin/projects/")) return <ProjectDetail role="master_admin" />;
   if (pathname === "/master-admin/tasks") return <AllLogs />;
   if (pathname === "/master-admin/users") return <AllUsers />;
   if (pathname.startsWith("/master-admin/users/")) return <UserDetail />;

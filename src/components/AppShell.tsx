@@ -20,6 +20,7 @@ import {
   BarChart3,
   TrendingUp,
   History,
+  Briefcase,
 } from "lucide-react";
 import logo from "@/assests/Experience_my_India.webp";
 import { ThemeToggle } from "./theme-toggle";
@@ -42,6 +43,7 @@ type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };
 
 const employeeNav: NavItem[] = [
   { to: "/employee/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/employee/projects", label: "My Projects", icon: Briefcase },
   { to: "/employee/today", label: "Today's Tasks", icon: Activity },
   { to: "/employee/tasks", label: "Task Board", icon: ClipboardList },
   { to: "/employee/messages", label: "Messages", icon: MessageSquare },
@@ -50,6 +52,7 @@ const employeeNav: NavItem[] = [
 
 const adminNav: NavItem[] = [
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/admin/projects", label: "Projects", icon: Briefcase },
   { to: "/admin/today", label: "Today's Tasks", icon: Activity },
   { to: "/admin/tasks", label: "Task Board", icon: ClipboardList },
   { to: "/admin/users", label: "All Users", icon: Users },
@@ -60,6 +63,7 @@ const adminNav: NavItem[] = [
 
 const masterAdminNav: NavItem[] = [
   { to: "/master-admin/dashboard", label: "Global Intel", icon: LayoutDashboard },
+  { to: "/master-admin/projects", label: "Project Hub", icon: Briefcase },
   { to: "/master-admin/today", label: "Today's Tasks", icon: Activity },
   { to: "/master-admin/tasks", label: "Enterprise Board", icon: ClipboardList },
   { to: "/master-admin/users", label: "All Users", icon: Users },
@@ -81,7 +85,7 @@ function SidebarNav({ items, onNavigate }: { items: NavItem[]; onNavigate?: () =
           to={item.to}
           onClick={onNavigate}
           className="group flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          activeClassName="!bg-accent !text-accent-foreground"
+          activeClassName="!bg-blue-600 !text-white shadow-lg shadow-blue-200"
         >
           <item.icon className="h-4 w-4 shrink-0 opacity-80 group-hover:opacity-100" />
           <span className="truncate">{item.label}</span>

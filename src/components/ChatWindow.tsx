@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { messaging } from '@/lib/api';
+import { messaging, files as fileApi } from '@/lib/api';
+
 import { ChatMessage } from './ChatMessage';
 import { MentionInput } from './MentionInput';
 import { Button } from '@/components/ui/button';
@@ -109,22 +110,36 @@ export function ChatWindow({
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files) return;
+    if (!files || files.length === 0) return;
 
-    // Simulate upload
-    const newAttachments = Array.from(files).map(file => ({
-      name: file.name,
-      url: URL.createObjectURL(file), 
-      type: file.type.startsWith('image/') ? 'image' : 
-            file.name.endsWith('.pdf') ? 'document' :
-            file.name.endsWith('.xlsx') ? 'spreadsheet' : 'document'
-    }));
+    setIsSending(true);
+    try {
+      const uploadPromises = Array.from(files).map(file => fileApi.upload(file));
+      const results = await Promise.all(uploadPromises);
+      
+      const newAttachments = results
+        .filter(res => res.success)
+        .map(res => ({
+          name: res.data.name,
+          url: res.data.url, 
+          type: res.data.type?.startsWith('image/') ? 'image' : 
+                res.data.name?.endsWith('.pdf') ? 'document' :
+                res.data.name?.endsWith('.xlsx') ? 'spreadsheet' : 'document'
+        }));
 
-    setAttachments(prev => [...prev, ...newAttachments]);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+      setAttachments(prev => [...prev, ...newAttachments]);
+      toast.success("Files uploaded successfully");
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast.error("Failed to upload files");
+    } finally {
+      setIsSending(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
+
 
   const removeAttachment = (index: number) => {
     setAttachments(prev => prev.filter((_, i) => i !== index));

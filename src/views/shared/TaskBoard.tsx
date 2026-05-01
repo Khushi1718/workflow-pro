@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "@/lib/router";
 import { AppShell } from "@/components/AppShell";
-import { tasks, auth as authApi, admin, apiRequest } from "@/lib/api";
+import { tasks, auth as authApi, admin, apiRequest, projects, files as fileApi } from "@/lib/api";
+
 import { 
   ClipboardList, 
   Plus, 
@@ -27,7 +29,8 @@ import {
   File,
   Users,
   ShieldCheck,
-  ArrowUpRight
+  ArrowUpRight,
+  Briefcase
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,6 +72,8 @@ export default function TaskBoard({
   );
   const [filterDate, setFilterDate] = useState<string>(initialDate || "");
   const [filterDepartment, setFilterDepartment] = useState<string>("all");
+  const [filterProjectId, setFilterProjectId] = useState<string>("all");
+  const [allProjects, setAllProjects] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isTasksModalOpen, setIsTasksModalOpen] = useState(false);
@@ -81,6 +86,7 @@ export default function TaskBoard({
   const [assignmentForm, setAssignmentForm] = useState({
     title: "",
     assignedTo: "",
+    projectId: "",
     tasks: [{ title: "", description: "", deadline: "", priority: "medium" }]
   });
   
@@ -95,11 +101,17 @@ export default function TaskBoard({
 
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [assigneeSearch, setAssigneeSearch] = useState("");
+  const [selectedAssignee, setSelectedAssignee] = useState<any>(null);
 
   // Initialize filters based on URL
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const aid = params.get('assignmentId');
+    const pid = params.get('projectId');
+    
+    if (pid) setFilterProjectId(pid);
+    
     if (aid) {
       setType("all");
       setFilterDate("");
@@ -143,7 +155,8 @@ export default function TaskBoard({
         undefined, 
         debouncedSearch, 
         filterDate, 
-        filterDepartment === "all" ? undefined : filterDepartment
+        filterDepartment === "all" ? undefined : filterDepartment,
+        filterProjectId === "all" ? undefined : filterProjectId
       );
       if (res.success) {
         // Normalize "Development" to "Tech" in real-time
@@ -178,13 +191,18 @@ export default function TaskBoard({
 
   const fetchUsers = async () => {
     try {
-      const [usersRes, profileRes] = await Promise.all([
+      const [usersRes, profileRes, projectsRes] = await Promise.all([
         role !== "employee" ? admin.getAllUsers(100, 0) : Promise.resolve({ success: true, data: [] }),
-        authApi.getProfile()
+        authApi.getProfile(),
+        projects.getAll()
       ]);
       
       if (profileRes.success) {
         setCurrentUser(profileRes.data);
+      }
+
+      if (projectsRes.success) {
+        setAllProjects(projectsRes.data || []);
       }
       
       if (role !== "employee" && usersRes.success && profileRes.success) {
@@ -215,7 +233,7 @@ export default function TaskBoard({
   useEffect(() => {
     fetchTasks();
     fetchUsers();
-  }, [type, debouncedSearch, filterDate, filterDepartment]);
+  }, [type, debouncedSearch, filterDate, filterDepartment, filterProjectId]);
 
   const handleCreateAssignment = async () => {
     if (!assignmentForm.title || !assignmentForm.assignedTo) {
@@ -232,6 +250,7 @@ export default function TaskBoard({
     try {
       const payload = {
         ...assignmentForm,
+        projectId: assignmentForm.projectId === "none" ? undefined : assignmentForm.projectId,
         tasks: validTasks
       };
       console.log("Sending payload:", payload);
@@ -243,8 +262,11 @@ export default function TaskBoard({
         setAssignmentForm({
           title: "",
           assignedTo: "",
+          projectId: "",
           tasks: [{ title: "", description: "", deadline: "", priority: "medium" }]
         });
+        setAssigneeSearch("");
+        setSelectedAssignee(null);
       }
     } catch (error: any) {
       toast.error(error.message || "Failed to create assignment");
@@ -310,16 +332,14 @@ export default function TaskBoard({
       
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        // Mock upload call
-        const res = await apiRequest("/upload", {
-          method: "POST",
-          body: JSON.stringify({ name: file.name, type: file.type })
-        });
+        // Actual upload call
+        const res = await fileApi.upload(file);
 
         if (res.success) {
           newFiles.push(res.data);
         }
       }
+
       
       setEvidenceData({ ...evidenceData, evidenceFiles: newFiles });
       toast.success("Files uploaded successfully");
@@ -387,22 +407,77 @@ export default function TaskBoard({
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="assignee" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Assign To</Label>
-                  <Select value={assignmentForm.assignedTo} onValueChange={(v) => setAssignmentForm({...assignmentForm, assignedTo: v})}>
-                    <SelectTrigger id="assignee" className="h-11 shadow-sm border-border/50">
-                      <SelectValue placeholder="Select team member" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {users.map(u => (
-                        <SelectItem key={u._id} value={u._id}>
-                          <div className="flex flex-col items-start py-0.5">
-                            <span className="font-bold text-sm">{u.name}</span>
-                            <span className="text-[10px] text-muted-foreground uppercase">{u.role} • {u.team}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input 
+                      placeholder="Type name to search..." 
+                      className="h-11 pl-9 shadow-sm border-border/50 focus:border-primary/50 transition-all"
+                      value={assigneeSearch}
+                      onChange={(e) => {
+                        setAssigneeSearch(e.target.value);
+                        setSelectedAssignee(null);
+                        setAssignmentForm({ ...assignmentForm, assignedTo: "" });
+                      }}
+                    />
+                    
+                    <AnimatePresence>
+                      {assigneeSearch && !selectedAssignee && (
+                        <motion.div 
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="absolute top-full left-0 right-0 mt-2 bg-white border border-border/50 shadow-2xl rounded-2xl overflow-hidden z-50 max-h-[200px] overflow-y-auto"
+                        >
+                          {users
+                            .filter(u => u.name.toLowerCase().includes(assigneeSearch.toLowerCase()))
+                            .length === 0 ? (
+                              <div className="p-4 text-center text-[10px] font-bold text-muted-foreground uppercase tracking-widest italic">No members found</div>
+                            ) : (
+                              users
+                                .filter(u => u.name.toLowerCase().includes(assigneeSearch.toLowerCase()))
+                                .map(u => (
+                                  <button
+                                    key={u._id}
+                                    onClick={() => {
+                                      setSelectedAssignee(u);
+                                      setAssigneeSearch(u.name);
+                                      setAssignmentForm({ ...assignmentForm, assignedTo: u._id || u.id });
+                                    }}
+                                    className="w-full flex items-center gap-3 p-3 hover:bg-accent/5 transition-colors text-left border-b border-border/10 last:border-0"
+                                  >
+                                    <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold">
+                                      {u.name[0]}
+                                    </div>
+                                    <div>
+                                      <p className="text-xs font-bold text-foreground">{u.name}</p>
+                                      <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">{u.role} • {u.team}</p>
+                                    </div>
+                                  </button>
+                                ))
+                            )
+                          }
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="project" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Link to Project (Optional)</Label>
+                <Select value={assignmentForm.projectId} onValueChange={(v) => setAssignmentForm({...assignmentForm, projectId: v})}>
+                  <SelectTrigger id="project" className="h-11 shadow-sm border-border/50">
+                    <SelectValue placeholder="No Project Linked" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Project Linked</SelectItem>
+                    {allProjects.map(p => (
+                      <SelectItem key={p._id} value={p._id}>
+                        <span className="font-bold text-sm">{p.name}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-4">
@@ -652,6 +727,23 @@ export default function TaskBoard({
                   </Select>
                 </div>
               )}
+            </div>
+
+            <div className="flex items-center gap-2 bg-background/50 p-1 rounded-lg border border-border/50 shadow-sm">
+               <div className="flex items-center gap-2 px-2">
+                  <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
+                  <Select value={filterProjectId} onValueChange={setFilterProjectId}>
+                    <SelectTrigger className="h-8 w-32 border-none bg-transparent text-[11px] font-bold uppercase shadow-none focus:ring-0">
+                      <SelectValue placeholder="PROJECT" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Projects</SelectItem>
+                      {allProjects.map(p => (
+                        <SelectItem key={p._id} value={p._id}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
             </div>
           </div>
         </div>

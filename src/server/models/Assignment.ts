@@ -5,6 +5,7 @@ export interface IAssignment extends Document {
   assignedTo: mongoose.Types.ObjectId;
   title: string; // e.g. "Weekly SEO Sprint"
   status: "pending" | "in_progress" | "completed";
+  projectId?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -20,6 +21,11 @@ const assignmentSchema = new Schema<IAssignment>(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
+    },
+    projectId: {
+      type: Schema.Types.ObjectId,
+      ref: "Project",
+      required: false, // Optional for backward compatibility/one-offs
     },
     title: {
       type: String,
