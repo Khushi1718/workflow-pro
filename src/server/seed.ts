@@ -2,6 +2,10 @@ import mongoose from "mongoose";
 import { connectDB } from "./db";
 import User from "./models/User";
 import WorkLog from "./models/WorkLog";
+import * as dotenv from "dotenv";
+
+dotenv.config();
+
 
 async function seedDatabase() {
   try {
