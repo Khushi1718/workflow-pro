@@ -15,8 +15,8 @@ async function seedProduction() {
     console.log(`Connected to: ${maskedUri}`);
 
     // 1. Create Master Admin
-    const masterEmail = "master@workflowpro.com";
-    const masterPassword = "MasterPassword123!"; // Recommendation: Change this immediately
+    const masterEmail = "master@google.com";
+    const masterPassword = "password123"; // Recommendation: Change this immediately
     
     const existingMaster = await User.findOne({ email: masterEmail });
     if (!existingMaster) {
@@ -36,8 +36,8 @@ async function seedProduction() {
     }
 
     // 2. Create a default Admin
-    const adminEmail = "admin@workflowpro.com";
-    const adminPassword = "AdminPassword123!";
+    const adminEmail = "admin@google.com";
+    const adminPassword = "password123";
     
     const existingAdmin = await User.findOne({ email: adminEmail });
     if (!existingAdmin) {

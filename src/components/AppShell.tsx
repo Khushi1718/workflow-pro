@@ -38,6 +38,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { auth } from "@/lib/api";
+import { useAuthStore } from "@/store/authStore";
+
 
 type NavItem = { to: string; label: string; icon: typeof LayoutDashboard };
 
@@ -116,7 +118,7 @@ export function AppShell({
   subtitle?: string;
   actions?: ReactNode;
 }) {
-  const [user, setUser] = useState<any>(null);
+  const { user, fetchProfile, logout: storeLogout } = useAuthStore();
   const activeRole = user?.role || role;
   const items = activeRole === "master_admin" ? masterAdminNav : activeRole === "admin" ? adminNav : employeeNav;
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -124,22 +126,14 @@ export function AppShell({
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user) return;
-    const fetchUser = async () => {
-      try {
-        const res = await auth.getProfile();
-        if (res.success && res.data) {
-          setUser(res.data);
-        } else {
-          navigate("/");
-        }
-      } catch (err) {
-        console.error("Failed to fetch user profile", err);
+    fetchProfile().then(() => {
+      // If after fetching still no user, and it's not the initial mount (isLoading false), then redirect
+      if (!useAuthStore.getState().user && !useAuthStore.getState().isLoading) {
         navigate("/");
       }
-    };
-    fetchUser();
-  }, [navigate, user]);
+    });
+  }, [fetchProfile, navigate]);
+
 
   if (!user) {
     return (
@@ -232,9 +226,10 @@ export function AppShell({
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive cursor-pointer"
                   onClick={() => {
-                    auth.logout();
+                    storeLogout();
                     navigate("/");
                   }}
+
                 >
                   <LogOut className="mr-2 h-4 w-4" /> Sign out
                 </DropdownMenuItem>

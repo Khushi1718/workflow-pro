@@ -1,7 +1,9 @@
 import { useEffect, useState, useRef } from "react";
 import { AppShell } from "@/components/AppShell";
 import { auth, tasks, admin } from "@/lib/api";
+import { useAuthStore } from "@/store/authStore";
 import { cn } from "@/lib/utils";
+
 import { 
   Users, 
   CheckCircle2, 
@@ -60,7 +62,8 @@ const getGreeting = () => {
 };
 
 export default function MasterAdminDashboard() {
-  const [user, setUser] = useState<any>(null);
+  const { user: storeUser } = useAuthStore();
+  const [user, setUser] = useState<any>(storeUser);
   const [allAssignments, setAllAssignments] = useState<any[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -89,13 +92,20 @@ export default function MasterAdminDashboard() {
     const fetchData = async () => {
       try {
         setIsLoading(true);
+        
+        // Parallelize all major data fetching
+        const tasksPromise = tasks.getAll("all");
+        const usersPromise = admin.getAllUsers();
+        const profilePromise = !storeUser ? auth.getProfile() : Promise.resolve({ success: true, data: storeUser });
+
         const [profileRes, tasksRes, usersRes] = await Promise.all([
-          auth.getProfile(),
-          tasks.getAll("all"),
-          admin.getAllUsers()
+          profilePromise,
+          tasksPromise,
+          usersPromise
         ]);
 
         if (profileRes.success) setUser(profileRes.data);
+
         
         const assignmentsData = tasksRes.data || [];
         const usersData = usersRes.data || [];

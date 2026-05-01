@@ -3,7 +3,9 @@ import { Link } from "@/lib/router";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { auth, tasks } from "@/lib/api";
+import { useAuthStore } from "@/store/authStore";
 import { cn } from "@/lib/utils";
+
 import { 
   CheckCircle2, 
   Clock, 
@@ -55,7 +57,8 @@ const getGreeting = () => {
 };
 
 export default function EmployeeDashboard() {
-  const [user, setUser] = useState<any>(null);
+  const { user: storeUser } = useAuthStore();
+  const [user, setUser] = useState<any>(storeUser);
   const [myTasks, setMyTasks] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [graphRange, setGraphRange] = useState<"this" | "last">("this");
@@ -76,15 +79,21 @@ export default function EmployeeDashboard() {
     const fetchData = async () => {
       try {
         setIsLoading(true);
+        
+        // Parallelize data fetching but skip profile if we have it
+        const tasksPromise = tasks.getAll("assigned_to_me");
+        const profilePromise = !storeUser ? auth.getProfile() : Promise.resolve({ success: true, data: storeUser });
+        
         const [profileRes, tasksRes] = await Promise.all([
-          auth.getProfile(),
-          tasks.getAll("assigned_to_me")
+          profilePromise,
+          tasksPromise
         ]);
 
         if (profileRes.success) setUser(profileRes.data);
         const myProfile = profileRes.data;
         const tasksData = tasksRes.data || [];
         const myId = String(myProfile?._id || myProfile?.id || "");
+
 
         const now = new Date();
         const startOfToday = new Date();

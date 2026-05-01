@@ -3,7 +3,9 @@ import { Link } from "@/lib/router";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { admin, auth, tasks } from "@/lib/api";
+import { useAuthStore } from "@/store/authStore";
 import { cn } from "@/lib/utils";
+
 import { 
   CheckCircle2, 
   Users, 
@@ -55,7 +57,8 @@ const getGreeting = () => {
 };
 
 export default function AdminDashboard() {
-  const [user, setUser] = useState<any>(null);
+  const { user: storeUser } = useAuthStore();
+  const [user, setUser] = useState<any>(storeUser);
   const [allAssignments, setAllAssignments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [graphRange, setGraphRange] = useState<"this" | "last">("this");
@@ -74,15 +77,21 @@ export default function AdminDashboard() {
     const fetchData = async () => {
       try {
         setIsLoading(true);
+        
+        // Parallelize data fetching but skip profile if we have it
+        const tasksPromise = tasks.getAll("all");
+        const profilePromise = !storeUser ? auth.getProfile() : Promise.resolve({ success: true, data: storeUser });
+
         const [profileRes, tasksRes] = await Promise.all([
-          auth.getProfile(),
-          tasks.getAll("all")
+          profilePromise,
+          tasksPromise
         ]);
 
         if (!profileRes.success) throw new Error("Profile fetch failed");
         
         const myProfile = profileRes.data;
         setUser(myProfile);
+
         
         const assignmentsData = tasksRes.data || [];
         const myId = String(myProfile?._id || myProfile?.id || "");
