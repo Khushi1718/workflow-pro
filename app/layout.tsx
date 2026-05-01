@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import "@/index.css";
 import { Providers } from "@/components/providers";
+
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Workflow Pro",
@@ -9,10 +12,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body>
+    <html lang="en" suppressHydrationWarning className={inter.className}>
+      <body className={inter.className}>
         <Providers>{children}</Providers>
       </body>
     </html>
   );
 }
+

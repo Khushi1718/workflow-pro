@@ -4,7 +4,9 @@ import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { auth, tasks } from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
+import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { cn } from "@/lib/utils";
+
 
 import { 
   CheckCircle2, 
@@ -57,7 +59,8 @@ const getGreeting = () => {
 };
 
 export default function EmployeeDashboard() {
-  const { user: storeUser } = useAuthStore();
+  const storeUser = useAuthStore(state => state.user);
+
   const [user, setUser] = useState<any>(storeUser);
   const [myTasks, setMyTasks] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -204,14 +207,12 @@ export default function EmployeeDashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#fafafa] dark:bg-[#09090b]">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-6 w-6 animate-spin text-zinc-900" />
-          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-400">Syncing Personal Node...</p>
-        </div>
-      </div>
+      <AppShell role="employee" title="Personal Intelligence">
+        <DashboardSkeleton />
+      </AppShell>
     );
   }
+
 
   return (
     <AppShell role="employee" title="Personal Intelligence">

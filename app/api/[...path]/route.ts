@@ -224,7 +224,7 @@ export async function POST(request: NextRequest, context: any) {
           }
 
           try {
-            await logActivity(request, {
+            logActivity(request, {
               userId: auth.user.userId,
               action: "create_assignment",
               resourceType: "user",
@@ -295,7 +295,7 @@ export async function POST(request: NextRequest, context: any) {
       role: ["admin", "employee"].includes(targetRole) ? targetRole : "employee",
     });
     
-    await logActivity(request, {
+    logActivity(request, {
       userId: auth.user.userId,
       action: "create_user",
       resourceType: "user",
@@ -325,7 +325,7 @@ export async function POST(request: NextRequest, context: any) {
 
     const token = generateToken(user._id.toString(), user.role);
 
-    await logActivity(request, {
+    logActivity(request, {
       userId: user._id.toString(),
       action: "login",
       resourceType: "user",
@@ -400,7 +400,7 @@ export async function POST(request: NextRequest, context: any) {
 
         await existingLog.save();
 
-        await logActivity(request, {
+        logActivity(request, {
           userId: auth.user.userId,
           action: "update_log",
           resourceType: "worklog",
@@ -429,7 +429,7 @@ export async function POST(request: NextRequest, context: any) {
         state: "draft", // Always start as draft
       });
 
-      await logActivity(request, {
+      logActivity(request, {
         userId: auth.user.userId,
         action: "create_log",
         resourceType: "worklog",
@@ -583,7 +583,8 @@ export async function GET(request: NextRequest, context: Context) {
     const auth = requireAuth(request);
     if (auth.response) return auth.response;
 
-    const user = await User.findById(auth.user.userId);
+    const user = await User.findById(auth.user.userId).lean();
+
     if (!user) return fail(404, "User not found");
 
     return ok("Profile retrieved", {
@@ -606,10 +607,14 @@ export async function GET(request: NextRequest, context: Context) {
       filter.members = new Types.ObjectId(auth.user.userId);
     }
     const projectsList = await Project.find(filter)
+      .select("name description clientName status members createdBy createdAt")
       .populate("members", "name email role team")
       .populate("createdBy", "name")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
+
     return ok("Projects retrieved", projectsList);
+
   }
 
   const projectDetailMatch = path.match(/^\/projects\/([^/]+)$/);
@@ -619,8 +624,12 @@ export async function GET(request: NextRequest, context: Context) {
     const projectId = projectDetailMatch[1];
 
     const project = await Project.findById(projectId)
+      .select("name description clientName status members createdBy createdAt")
       .populate("members", "name email role team")
-      .populate("createdBy", "name");
+      .populate("createdBy", "name")
+      .lean();
+
+
     if (!project) return fail(404, "Project not found");
     
     // Check permission
@@ -656,10 +665,13 @@ export async function GET(request: NextRequest, context: Context) {
       filter.state = { $in: ["submitted", "auto_submitted"] };
     }
 
-    const logs = await WorkLog.find(filter).sort({ date: -1 }).limit(limitNum).skip(skipNum).lean();
-    const total = await WorkLog.countDocuments(filter);
+    const [logs, total] = await Promise.all([
+      WorkLog.find(filter).sort({ date: -1 }).limit(limitNum).skip(skipNum).lean(),
+      WorkLog.countDocuments(filter)
+    ]);
 
-    await logActivity(request, {
+
+    logActivity(request, {
       userId: auth.user.userId,
       action: "view_logs",
       resourceType: "worklog",
@@ -691,7 +703,8 @@ export async function GET(request: NextRequest, context: Context) {
     const log = await WorkLog.findOne({
       userId: auth.user.userId,
       date: { $gte: start, $lte: end }
-    }).sort({ createdAt: -1 });
+    }).sort({ createdAt: -1 }).lean();
+
 
     return ok("Today's log retrieved", log);
   }
@@ -705,10 +718,11 @@ export async function GET(request: NextRequest, context: Context) {
     
     let workLog;
     if (Types.ObjectId.isValid(logId)) {
-      workLog = await WorkLog.findById(logId).populate("userId", "name email");
+      workLog = await WorkLog.findById(logId).populate("userId", "name email").lean();
     } else {
-      workLog = await WorkLog.findOne({ id: logId }).populate("userId", "name email");
+      workLog = await WorkLog.findOne({ id: logId }).populate("userId", "name email").lean();
     }
+
     
     if (!workLog) return fail(404, "Work log not found");
 
@@ -733,15 +747,28 @@ export async function GET(request: NextRequest, context: Context) {
     if (role) filter.role = role;
 
     const users = await User.find(filter).select("-password").sort({ joinedAt: -1 }).limit(limitNum).skip(skipNum).lean();
-    const usersWithCounts = await Promise.all(
-      users.map(async (u) => ({
-        ...u,
-        totalLogs: await WorkLog.countDocuments({ userId: u._id }),
-      }))
-    );
+    
+    // Optimizing log counts - fetch only what's needed
+    const userIds = users.map(u => u._id);
+    const logCounts = await WorkLog.aggregate([
+      { $match: { userId: { $in: userIds } } },
+      { $group: { _id: "$userId", count: { $sum: 1 } } }
+    ]);
+
+    const countsMap = logCounts.reduce((acc: any, curr: any) => {
+      acc[curr._id.toString()] = curr.count;
+      return acc;
+    }, {});
+
+    const usersWithCounts = users.map(u => ({
+      ...u,
+      totalLogs: countsMap[u._id.toString()] || 0
+    }));
+
     const total = await User.countDocuments(filter);
 
-    await logActivity(request, {
+
+    logActivity(request, {
       userId: auth.user.userId,
       action: "view_users",
       resourceType: "user",
@@ -764,11 +791,12 @@ export async function GET(request: NextRequest, context: Context) {
       return fail(404, "User not found");
     }
 
-    const user = await User.findById(userId).select("-password");
+    const user = await User.findById(userId).select("-password").lean();
     if (!user) return fail(404, "User not found");
 
     const totalLogs = await WorkLog.countDocuments({ userId: new Types.ObjectId(userId) });
-    return ok("User retrieved successfully", { ...user.toObject(), totalLogs });
+    return ok("User retrieved successfully", { ...user, totalLogs });
+
   }
 
   if (path === "/admin/logs/all") {
@@ -798,14 +826,16 @@ export async function GET(request: NextRequest, context: Context) {
     else if (sortBy === "userId") sortObj.userId = sortOrder === "asc" ? 1 : -1;
 
     const logs = await WorkLog.find(filter)
+      .select("userId date status tasks state submittedAt createdAt")
       .populate("userId", "name email team")
       .sort(sortObj)
       .limit(limitNum)
       .skip(skipNum)
       .lean();
+
     const total = await WorkLog.countDocuments(filter);
 
-    await logActivity(request, {
+    logActivity(request, {
       userId: auth.user.userId,
       action: "view_logs",
       resourceType: "worklog",
@@ -841,11 +871,13 @@ export async function GET(request: NextRequest, context: Context) {
     if (status) filter.status = status;
 
     const logs = await WorkLog.find(filter)
+      .select("userId date status tasks state submittedAt createdAt")
       .populate("userId", "name email team")
       .sort({ createdAt: -1 })
       .limit(limitNum)
       .skip(skipNum)
       .lean();
+
     const total = await WorkLog.countDocuments(filter);
 
     return ok("Today logs retrieved successfully", logs, 200, {
@@ -958,7 +990,9 @@ export async function GET(request: NextRequest, context: Context) {
     const messages = await Message.find(filter)
       .populate("senderId", "name email role")
       .sort({ createdAt: 1 })
-      .limit(100);
+      .limit(100)
+      .lean();
+
 
     return ok("Messages retrieved", messages);
   }
@@ -973,7 +1007,9 @@ export async function GET(request: NextRequest, context: Context) {
         populate: { path: "senderId", select: "name email" }
       })
       .sort({ createdAt: -1 })
-      .limit(50);
+      .limit(50)
+      .lean();
+
 
     return ok("Notifications retrieved", notifications);
   }
@@ -1323,7 +1359,7 @@ export async function PUT(request: NextRequest, context: Context) {
     const user = await User.findByIdAndUpdate(auth.user.userId, { name, team, email }, { new: true, runValidators: true });
     if (!user) return fail(404, "User not found");
 
-    await logActivity(request, {
+    logActivity(request, {
       userId: auth.user.userId,
       action: "update_user",
       resourceType: "user",
@@ -1354,7 +1390,7 @@ export async function PUT(request: NextRequest, context: Context) {
     user.password = newPassword;
     await user.save();
 
-    await logActivity(request, {
+    logActivity(request, {
       userId: auth.user.userId,
       action: "password_change",
       resourceType: "user",
@@ -1419,7 +1455,7 @@ export async function PUT(request: NextRequest, context: Context) {
     ).select("-password");
     if (!user) return fail(404, "User not found");
 
-    await logActivity(request, {
+    logActivity(request, {
       userId: auth.user.userId,
       action: "role_change",
       resourceType: "user",
@@ -1462,7 +1498,7 @@ export async function PUT(request: NextRequest, context: Context) {
 
     await workLog.save();
 
-    await logActivity(request, {
+    logActivity(request, {
       userId: auth.user.userId,
       action: "update_task",
       resourceType: "worklog",
@@ -1506,7 +1542,7 @@ export async function PUT(request: NextRequest, context: Context) {
       runValidators: true,
     });
 
-    await logActivity(request, {
+    logActivity(request, {
       userId: auth.user.userId,
       action: "update_log",
       resourceType: "worklog",
@@ -1547,7 +1583,7 @@ export async function PUT(request: NextRequest, context: Context) {
     
     await workLog.save();
 
-    await logActivity(request, {
+    logActivity(request, {
       userId: auth.user.userId,
       action: isAutoSubmit ? "auto_submit_log" : "submit_log",
       resourceType: "worklog",
@@ -1648,7 +1684,7 @@ export async function PUT(request: NextRequest, context: Context) {
 
     await task.save();
 
-    await logActivity(request, {
+    logActivity(request, {
       userId: auth.user.userId,
       action: "update_task",
       resourceType: "task",

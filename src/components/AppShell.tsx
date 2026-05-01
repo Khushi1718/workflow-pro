@@ -1,4 +1,6 @@
 import { ReactNode, useState, useEffect } from "react";
+import Image from "next/image";
+
 import { NavLink } from "@/components/NavLink";
 import { Link, useLocation, useNavigate } from "@/lib/router";
 import {
@@ -100,10 +102,16 @@ function SidebarNav({ items, onNavigate }: { items: NavItem[]; onNavigate?: () =
 function Brand() {
   return (
     <Link to="/" className="flex items-center gap-2 px-5 py-5">
-      <img src={logo.src} alt="Experience My India Logo" className="h-14 w-auto object-contain dark:bg-white/95 dark:px-3 dark:py-1.5 dark:rounded-xl dark:shadow-[0_0_15px_rgba(255,255,255,0.05)] transition-all" />
+      <Image 
+        src={logo} 
+        alt="Experience My India Logo" 
+        className="h-14 w-auto object-contain dark:bg-white/95 dark:px-3 dark:py-1.5 dark:rounded-xl dark:shadow-[0_0_15px_rgba(255,255,255,0.05)] transition-all" 
+        priority
+      />
     </Link>
   );
 }
+
 
 export function AppShell({
   role,
@@ -118,7 +126,10 @@ export function AppShell({
   subtitle?: string;
   actions?: ReactNode;
 }) {
-  const { user, fetchProfile, logout: storeLogout } = useAuthStore();
+  const user = useAuthStore(state => state.user);
+  const fetchProfile = useAuthStore(state => state.fetchProfile);
+  const storeLogout = useAuthStore(state => state.logout);
+
   const activeRole = user?.role || role;
   const items = activeRole === "master_admin" ? masterAdminNav : activeRole === "admin" ? adminNav : employeeNav;
   const [mobileOpen, setMobileOpen] = useState(false);

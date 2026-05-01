@@ -2,7 +2,9 @@ import { useEffect, useState, useRef } from "react";
 import { AppShell } from "@/components/AppShell";
 import { auth, tasks, admin } from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
+import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { cn } from "@/lib/utils";
+
 
 import { 
   Users, 
@@ -232,14 +234,12 @@ export default function MasterAdminDashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#fafafa] dark:bg-[#09090b]">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-6 w-6 animate-spin text-zinc-900" />
-          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-400">Syncing Node Metrics...</p>
-        </div>
-      </div>
+      <AppShell role="master_admin" title="Global Overview">
+        <DashboardSkeleton />
+      </AppShell>
     );
   }
+
 
   return (
     <AppShell role="master_admin" title="Global Overview">

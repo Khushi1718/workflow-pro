@@ -4,7 +4,9 @@ import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { admin, auth, tasks } from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
+import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { cn } from "@/lib/utils";
+
 
 import { 
   CheckCircle2, 
@@ -223,14 +225,12 @@ export default function AdminDashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#fafafa] dark:bg-[#09090b]">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-6 w-6 animate-spin text-zinc-900" />
-          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-400">Synchronizing Global Nodes...</p>
-        </div>
-      </div>
+      <AppShell role="admin" title="Operations Control">
+        <DashboardSkeleton />
+      </AppShell>
     );
   }
+
 
   return (
     <AppShell role="admin" title="Operations Control">

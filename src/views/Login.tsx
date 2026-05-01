@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import Image from "next/image";
+
 import { Link, useNavigate } from "@/lib/router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -109,8 +111,14 @@ export default function Login() {
           {/* subtle Logo Header */}
           <div className="mb-12 text-center lg:text-left">
             <div className="inline-block p-4 rounded-[2rem] bg-zinc-50 dark:bg-white/5 border border-zinc-100 dark:border-white/5 mb-8 hover:scale-105 transition-transform duration-500">
-               <img src={logo.src} alt="Experience My India" className="h-10 w-auto object-contain" />
+               <Image 
+                 src={logo} 
+                 alt="Experience My India" 
+                 className="h-10 w-auto object-contain" 
+                 priority
+               />
             </div>
+
             <h1 className="text-4xl font-black tracking-tight text-foreground mb-4">Account Login</h1>
             <p className="text-zinc-500 dark:text-zinc-400 font-medium text-sm">
                Authorized access for Experience My India team members.
