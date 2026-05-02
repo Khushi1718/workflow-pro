@@ -233,10 +233,10 @@ export default function EmployeeDashboard() {
             <p className="text-[11px] font-black text-zinc-400 uppercase tracking-[0.4em] mt-3">Fueling your daily impact • Commit to excellence in every task</p>
           </div>
           <div className="flex items-center gap-4">
-             <Button asChild variant="outline" className="h-12 px-6 rounded-2xl border-zinc-200 bg-white shadow-sm text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] transition-all">
+             <Button asChild variant="outline" className="h-12 px-6 rounded-2xl border-zinc-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-zinc-900 dark:text-white shadow-sm text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] transition-all">
                 <Link to="/employee/logs">Daily Logs</Link>
              </Button>
-             <Button asChild className="h-12 px-8 rounded-2xl bg-zinc-950 text-white shadow-xl text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] transition-all">
+             <Button asChild className="h-12 px-8 rounded-2xl bg-zinc-950 dark:bg-blue-600 text-white shadow-xl text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] transition-all">
                 <Link to="/employee/tasks">Open Task Board <ArrowRight className="ml-2 h-4 w-4" /></Link>
              </Button>
           </div>
@@ -251,16 +251,16 @@ export default function EmployeeDashboard() {
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                {[
-                 { label: "Global Assigned", value: stats.total, icon: ClipboardList, bg: "bg-zinc-50" },
-                 { label: "Global Completed", value: stats.completed, icon: CheckCircle2, bg: "bg-emerald-50/30" },
-                 { label: "Global Pending", value: stats.pending, icon: Clock, bg: "bg-amber-50/30" }
+                 { label: "Global Assigned", value: stats.total, icon: ClipboardList, light: "bg-zinc-50", dark: "dark:bg-slate-800/60" },
+                 { label: "Global Completed", value: stats.completed, icon: CheckCircle2, light: "bg-emerald-50/40", dark: "dark:bg-emerald-950/40" },
+                 { label: "Global Pending", value: stats.pending, icon: Clock, light: "bg-amber-50/40", dark: "dark:bg-amber-950/40" }
                ].map((s, i) => (
-                 <div key={i} className={cn("p-7 rounded-[32px] border border-zinc-100 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all", s.bg)}>
+                 <div key={i} className={cn("p-7 rounded-[32px] border border-zinc-100 dark:border-slate-700/60 shadow-sm hover:shadow-md transition-all", s.light, s.dark)}>
                     <div className="flex items-center justify-between mb-3">
-                       <s.icon className="h-4 w-4 text-zinc-400" />
-                       <span className="text-2xl font-black tracking-tighter"><CountUp value={s.value} /></span>
+                       <s.icon className="h-4 w-4 text-zinc-400 dark:text-slate-500" />
+                       <span className="text-2xl font-black tracking-tighter text-zinc-900 dark:text-white"><CountUp value={s.value} /></span>
                     </div>
-                    <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{s.label}</p>
+                    <p className="text-[10px] font-black text-zinc-400 dark:text-slate-500 uppercase tracking-widest">{s.label}</p>
                  </div>
                ))}
             </div>
@@ -272,16 +272,16 @@ export default function EmployeeDashboard() {
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                {[
-                 { label: "Incoming Today", value: stats.todayTotal, icon: Sparkles, bg: "bg-zinc-50" },
-                 { label: "Completed Today", value: stats.todayCompleted, icon: CheckCircle2, bg: "bg-emerald-50/30" },
-                 { label: "Pending Today", value: stats.todayPending, icon: Clock, bg: "bg-amber-50/30" }
+                 { label: "Incoming Today", value: stats.todayTotal, icon: Sparkles, light: "bg-zinc-50", dark: "dark:bg-slate-800/60" },
+                 { label: "Completed Today", value: stats.todayCompleted, icon: CheckCircle2, light: "bg-emerald-50/40", dark: "dark:bg-emerald-950/40" },
+                 { label: "Pending Today", value: stats.todayPending, icon: Clock, light: "bg-amber-50/40", dark: "dark:bg-amber-950/40" }
                ].map((s, i) => (
-                 <div key={i} className={cn("p-7 rounded-[32px] border border-zinc-100 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all", s.bg)}>
+                 <div key={i} className={cn("p-7 rounded-[32px] border border-zinc-100 dark:border-slate-700/60 shadow-sm hover:shadow-md transition-all", s.light, s.dark)}>
                     <div className="flex items-center justify-between mb-3">
-                       <s.icon className="h-4 w-4 text-zinc-400" />
-                       <span className="text-2xl font-black tracking-tighter"><CountUp value={s.value} /></span>
+                       <s.icon className="h-4 w-4 text-zinc-400 dark:text-slate-500" />
+                       <span className="text-2xl font-black tracking-tighter text-zinc-900 dark:text-white"><CountUp value={s.value} /></span>
                     </div>
-                    <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{s.label}</p>
+                    <p className="text-[10px] font-black text-zinc-400 dark:text-slate-500 uppercase tracking-widest">{s.label}</p>
                  </div>
                ))}
             </div>
@@ -289,22 +289,22 @@ export default function EmployeeDashboard() {
         </div>
 
         {/* WEEKLY TREND */}
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-[48px] p-10 shadow-sm">
+        <div className="bg-white dark:bg-slate-800/50 border border-zinc-100 dark:border-slate-700/60 rounded-[48px] p-10 shadow-sm">
            <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
               <div>
-                <h2 className="text-[13px] font-black text-zinc-950 dark:text-zinc-50 uppercase tracking-[0.4em]">Personal Efficiency Trend</h2>
-                <p className="text-[11px] text-zinc-400 mt-2 uppercase font-bold tracking-widest">Workflow Execution velocity over time</p>
+                <h2 className="text-[13px] font-black text-zinc-950 dark:text-white uppercase tracking-[0.4em]">Personal Efficiency Trend</h2>
+                <p className="text-[11px] text-zinc-400 dark:text-slate-500 mt-2 uppercase font-bold tracking-widest">Workflow Execution velocity over time</p>
               </div>
-              <div className="flex bg-zinc-50 dark:bg-zinc-800 p-1.5 rounded-2xl border border-zinc-100">
+              <div className="flex bg-zinc-50 dark:bg-slate-700/50 p-1.5 rounded-2xl border border-zinc-100 dark:border-slate-700">
                 <button 
                   onClick={() => setGraphRange("this")}
-                  className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", graphRange === "this" ? "bg-white text-zinc-950 shadow-md" : "text-zinc-400 hover:text-zinc-600")}
+                  className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", graphRange === "this" ? "bg-white dark:bg-slate-600 text-zinc-950 dark:text-white shadow-md" : "text-zinc-400 dark:text-slate-400 hover:text-zinc-600")}
                 >
                   Current
                 </button>
                 <button 
                   onClick={() => setGraphRange("last")}
-                  className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", graphRange === "last" ? "bg-white text-zinc-950 shadow-md" : "text-zinc-400 hover:text-zinc-600")}
+                  className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", graphRange === "last" ? "bg-white dark:bg-slate-600 text-zinc-950 dark:text-white shadow-md" : "text-zinc-400 dark:text-slate-400 hover:text-zinc-600")}
                 >
                   Previous
                 </button>
@@ -313,13 +313,23 @@ export default function EmployeeDashboard() {
            <div className="h-[400px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={weeklyData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f1f1" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 800, fill: '#a1a1aa' }} dy={20} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 800, fill: '#a1a1aa' }} />
-                  <Tooltip contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 20px 50px rgba(0,0,0,0.1)', fontSize: '12px', fontWeight: 900 }} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(220 16% 20%)" className="dark:[stroke:hsl(220_16%_20%)]" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 800, fill: '#71717a' }} dy={20} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 800, fill: '#71717a' }} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      borderRadius: '16px', 
+                      border: '1px solid hsl(220 16% 24%)', 
+                      backgroundColor: 'hsl(220 16% 16%)',
+                      boxShadow: '0 20px 50px rgba(0,0,0,0.4)', 
+                      fontSize: '12px', 
+                      fontWeight: 900,
+                      color: 'hsl(210 40% 96%)'
+                    }} 
+                  />
                   <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', paddingBottom: '30px', letterSpacing: '0.1em' }} />
-                  <Line type="monotone" dataKey="assigned" name="Assigned" stroke="#18181b" strokeWidth={4} dot={{ r: 5, fill: '#18181b', strokeWidth: 3, stroke: '#fff' }} />
-                  <Line type="monotone" dataKey="completed" name="Completed" stroke="#10b981" strokeWidth={4} dot={{ r: 5, fill: '#10b981', strokeWidth: 3, stroke: '#fff' }} />
+                  <Line type="monotone" dataKey="assigned" name="Assigned" stroke="#6b7280" strokeWidth={3} dot={{ r: 5, fill: '#6b7280', strokeWidth: 2, stroke: 'transparent' }} />
+                  <Line type="monotone" dataKey="completed" name="Completed" stroke="#10b981" strokeWidth={3} dot={{ r: 5, fill: '#10b981', strokeWidth: 2, stroke: 'transparent' }} />
                 </LineChart>
               </ResponsiveContainer>
            </div>
@@ -327,42 +337,42 @@ export default function EmployeeDashboard() {
 
         {/* RECENT ACTIVITY LOGS */}
         <div className="grid lg:grid-cols-12 gap-10">
-           <div className="lg:col-span-8 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-[48px] p-12 shadow-sm">
+           <div className="lg:col-span-8 bg-white dark:bg-slate-800/50 border border-zinc-100 dark:border-slate-700/60 rounded-[48px] p-12 shadow-sm">
               <header className="flex items-center justify-between mb-12">
-                <h2 className="text-[13px] font-black text-zinc-950 dark:text-zinc-50 uppercase tracking-[0.4em] flex items-center gap-3">
-                  <History className="h-5 w-5 text-zinc-400" /> Recent Task Updates
+                <h2 className="text-[13px] font-black text-zinc-950 dark:text-white uppercase tracking-[0.4em] flex items-center gap-3">
+                  <History className="h-5 w-5 text-zinc-400 dark:text-slate-500" /> Recent Task Updates
                 </h2>
-                <Button asChild variant="ghost" className="text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-zinc-950">
+                <Button asChild variant="ghost" className="text-[10px] font-black uppercase tracking-widest text-zinc-400 dark:text-slate-500 hover:text-zinc-950 dark:hover:text-white">
                   <Link to="/employee/tasks">View Full Board <ChevronRight className="ml-1 h-3 w-3" /></Link>
                 </Button>
               </header>
               <div className="grid gap-6">
                 {recentLogs.length > 0 ? recentLogs.map((log, i) => (
-                  <div key={i} className="flex items-center justify-between p-6 rounded-3xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 group hover:border-zinc-200 transition-all">
+                  <div key={i} className="flex items-center justify-between p-6 rounded-3xl bg-zinc-50 dark:bg-slate-700/40 border border-zinc-100 dark:border-slate-700/50 group hover:border-zinc-200 dark:hover:border-slate-600 transition-all">
                     <div className="flex items-center gap-6">
                         <div className={cn("h-12 w-12 rounded-2xl flex items-center justify-center shadow-sm", 
-                          log.status === 'completed' ? 'bg-emerald-50 text-emerald-500' : 
-                          log.status === 'in_progress' ? 'bg-blue-50 text-blue-500' : 'bg-amber-50 text-amber-500'
+                          log.status === 'completed' ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-500' : 
+                          log.status === 'in_progress' ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-500' : 'bg-amber-50 dark:bg-amber-950/50 text-amber-500'
                         )}>
                           {log.status === 'completed' ? <CheckCircle2 className="h-5 w-5" /> : <Clock className="h-5 w-5" />}
                         </div>
                         <div>
-                          <p className="text-[13px] font-black text-zinc-900 dark:text-zinc-50">{log.title}</p>
-                          <p className="text-[10px] font-bold text-zinc-400 uppercase mt-1 tracking-wider">
+                          <p className="text-[13px] font-black text-zinc-900 dark:text-white">{log.title}</p>
+                          <p className="text-[10px] font-bold text-zinc-400 dark:text-slate-500 uppercase mt-1 tracking-wider">
                             {log.bundleTitle} • Admin: {log.adminName || 'System'}
                           </p>
                         </div>
                     </div>
                     <div className="text-right">
-                        <p className="text-[10px] font-black text-zinc-900 dark:text-zinc-50 uppercase tracking-tighter">
+                        <p className="text-[10px] font-black text-zinc-900 dark:text-white uppercase tracking-tighter">
                           {new Date(log.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </p>
                     </div>
                   </div>
                 )) : (
-                  <div className="py-20 text-center border-2 border-dashed border-zinc-100 rounded-[32px]">
-                    <ClipboardList className="h-10 w-10 text-zinc-100 mx-auto mb-4" />
-                    <p className="text-[11px] font-black text-zinc-400 uppercase tracking-widest">No recent task activity</p>
+                  <div className="py-20 text-center border-2 border-dashed border-zinc-100 dark:border-slate-700 rounded-[32px]">
+                    <ClipboardList className="h-10 w-10 text-zinc-100 dark:text-slate-700 mx-auto mb-4" />
+                    <p className="text-[11px] font-black text-zinc-400 dark:text-slate-500 uppercase tracking-widest">No recent task activity</p>
                   </div>
                 )}
               </div>

@@ -9,6 +9,7 @@ export interface IUser extends Document {
   isActive: boolean;
   joinedAt: Date;
   leftAt?: Date;
+  totalLogs: number;
   createdAt: Date;
   updatedAt: Date;
   matchPassword(enteredPassword: string): Promise<boolean>;
@@ -60,11 +61,22 @@ const userSchema = new Schema<IUser>(
       type: Date,
       default: null,
     },
+    totalLogs: {
+      type: Number,
+      default: 0,
+      index: true,
+    },
   },
   {
     timestamps: true,
   }
 );
+
+// Indexes for high-speed filtering in Admin Dashboards
+userSchema.index({ role: 1 });
+userSchema.index({ team: 1 });
+userSchema.index({ isActive: 1 });
+userSchema.index({ email: 1 }, { unique: true });
 
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();

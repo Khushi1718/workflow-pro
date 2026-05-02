@@ -91,6 +91,9 @@ const taskSchema = new Schema<ITask>(
 // Indexes for faster lookups
 taskSchema.index({ assignmentId: 1, status: 1 });
 taskSchema.index({ deadline: 1 });
+taskSchema.index({ status: 1 });
+taskSchema.index({ priority: 1 });
+taskSchema.index({ completedAt: -1 });
 
 if (mongoose.models.Task) {
   delete (mongoose.models as any).Task;

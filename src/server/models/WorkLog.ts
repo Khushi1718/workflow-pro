@@ -190,8 +190,11 @@ const workLogSchema = new Schema<IWorkLog>(
   }
 );
 
-// Unique index on userId + date to ensure single log per day per user
+// High-performance compound indexes for large-scale filtering
 workLogSchema.index({ userId: 1, date: -1 });
+workLogSchema.index({ userId: 1, status: 1, date: -1 });
+workLogSchema.index({ state: 1, date: -1 });
+workLogSchema.index({ status: 1, date: -1 });
 workLogSchema.index({ date: -1, userId: 1 });
 workLogSchema.index({ userId: 1, date: 1 }, { unique: true, sparse: true });
 

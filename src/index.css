@@ -2,13 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
 @layer base {
   :root {
-    
     --background: 0 0% 100%;
     --foreground: 222 32% 12%;
 
@@ -65,46 +60,58 @@ All colors MUST be HSL.
     --sidebar-ring: 221 83% 53%;
   }
 
+  /* ================================================================
+     PREMIUM DARK MODE — "Slate Night"
+     
+     Real visual depth hierarchy (lightness values):
+       Page background  → 7%   = #0e1117  (darkest layer)
+       Sidebar          → 6%   = #0c1016  (slightly darker sidebar)
+       Card/Panel       → 13%  = #19202e  (visibly elevated)
+       Elevated surface → 18%  = #222c3c  (hover/raised state)
+       Border           → 22%  = visible lines between elements
+       Muted text       → 58%  = clearly readable secondary text
+       Primary text     → 96%  = near-white, crisp
+  ================================================================ */
   .dark {
-    /* Premium deep-zinc theme for a sophisticated dark mode */
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --surface: 240 10% 3.9%;
-    --surface-foreground: 0 0% 98%;
+    --background:          220 16% 7%;
+    --foreground:          210 40% 96%;
 
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
+    --surface:             220 16% 10%;
+    --surface-foreground:  210 40% 96%;
 
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
+    --card:                220 16% 13%;
+    --card-foreground:     210 40% 96%;
 
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --popover:             220 16% 16%;
+    --popover-foreground:  210 40% 96%;
 
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
+    --primary:             217 91% 62%;
+    --primary-foreground:  220 16% 7%;
 
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
+    --secondary:           220 16% 18%;
+    --secondary-foreground:210 30% 85%;
 
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
+    --muted:               220 16% 15%;
+    --muted-foreground:    215 20% 58%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
+    --accent:              220 16% 20%;
+    --accent-foreground:   210 40% 96%;
 
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    --destructive:         0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
 
-    --sidebar-background: 240 10% 3.9%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --border:              220 16% 22%;
+    --input:               220 16% 15%;
+    --ring:                217 91% 62%;
+
+    --sidebar-background:  220 16% 6%;
+    --sidebar-foreground:  215 25% 75%;
+    --sidebar-primary:     217 91% 62%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent:      220 16% 13%;
+    --sidebar-accent-foreground: 210 40% 96%;
+    --sidebar-border:      220 16% 13%;
+    --sidebar-ring:        217 91% 62%;
   }
 }
 
@@ -124,7 +131,6 @@ All colors MUST be HSL.
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
 
-  /* Ultra-Clean Premium Ambient Glow - Light Mode */
   body::before {
     content: "";
     position: fixed;
@@ -134,12 +140,13 @@ All colors MUST be HSL.
     height: 100vh;
     z-index: -1;
     pointer-events: none;
-    background: radial-gradient(circle at 50% 0%, rgba(37, 99, 235, 0.04), transparent 60%);
+    background: radial-gradient(ellipse at 50% 0%, rgba(59, 130, 246, 0.03), transparent 55%);
   }
 
-  /* Ultra-Clean Premium Ambient Glow - Dark Mode */
   .dark body::before {
-    background: radial-gradient(circle at 50% 0%, rgba(37, 99, 235, 0.12), transparent 70%);
+    background:
+      radial-gradient(ellipse at 65% 0%, rgba(59, 130, 246, 0.07), transparent 60%),
+      radial-gradient(ellipse at 15% 90%, rgba(139, 92, 246, 0.04), transparent 50%);
   }
 
   h1, h2, h3, h4, h5 {
@@ -147,62 +154,168 @@ All colors MUST be HSL.
   }
 }
 
+/* ================================================================
+   DARK MODE — GLOBAL UTILITY OVERRIDES
+   
+   This fixes every hardcoded bg-white, bg-zinc-50, border-zinc-100,
+   text-zinc-900 that appears in components without explicit dark: class.
+   
+   Strategy: map light palette → dark palette preserving brightness intent:
+     white    → card (13% lightness)
+     zinc-50  → 16% lightness  
+     zinc-100 → 18% lightness
+     zinc-200 → 22% lightness (border territory)
+================================================================ */
+
+/* ── Backgrounds ──────────────────────────────────────────────── */
+.dark .bg-white {
+  background-color: hsl(220 16% 13%) !important;
+}
+.dark .bg-zinc-50 {
+  background-color: hsl(220 16% 16%) !important;
+}
+.dark .bg-zinc-100 {
+  background-color: hsl(220 16% 19%) !important;
+}
+.dark .bg-zinc-50\/50 {
+  background-color: hsl(220 16% 15% / 0.5) !important;
+}
+
+/* ── Borders ──────────────────────────────────────────────────── */
+.dark .border-zinc-100 {
+  border-color: hsl(220 16% 22%) !important;
+}
+.dark .border-zinc-200 {
+  border-color: hsl(220 16% 24%) !important;
+}
+.dark .border-zinc-200\/50 {
+  border-color: hsl(220 16% 24% / 0.6) !important;
+}
+
+/* ── Text ─────────────────────────────────────────────────────── */
+.dark .text-zinc-900 {
+  color: hsl(210 40% 96%) !important;
+}
+.dark .text-zinc-800 {
+  color: hsl(210 30% 88%) !important;
+}
+.dark .text-zinc-700 {
+  color: hsl(215 20% 78%) !important;
+}
+.dark .text-zinc-600 {
+  color: hsl(215 20% 68%) !important;
+}
+.dark .text-zinc-500 {
+  color: hsl(215 15% 58%) !important;
+}
+.dark .text-zinc-400 {
+  color: hsl(215 15% 52%) !important;
+}
+.dark .text-zinc-300 {
+  color: hsl(215 12% 42%) !important;
+}
+
+/* ── Semantic background pills ────────────────────────────────── */
+.dark .bg-emerald-50,
+.dark .bg-emerald-50\/20 {
+  background-color: hsl(152 30% 11%) !important;
+}
+.dark .bg-emerald-50\/30 {
+  background-color: hsl(152 25% 10%) !important;
+}
+.dark .bg-emerald-950\/20 {
+  background-color: hsl(152 35% 9%) !important;
+}
+.dark .bg-amber-50,
+.dark .bg-amber-50\/20 {
+  background-color: hsl(38 30% 11%) !important;
+}
+.dark .bg-amber-50\/30 {
+  background-color: hsl(38 25% 9%) !important;
+}
+.dark .bg-blue-50 {
+  background-color: hsl(217 30% 13%) !important;
+}
+.dark .bg-rose-50 {
+  background-color: hsl(0 30% 12%) !important;
+}
+.dark .bg-purple-50 {
+  background-color: hsl(270 25% 13%) !important;
+}
+
+/* ── Semantic text (stays vivid) ──────────────────────────────── */
+.dark .text-emerald-600 { color: hsl(152 60% 50%) !important; }
+.dark .text-emerald-500 { color: hsl(152 60% 50%) !important; }
+.dark .text-amber-600   { color: hsl(38 85% 55%) !important; }
+.dark .text-amber-500   { color: hsl(38 85% 55%) !important; }
+.dark .text-blue-600    { color: hsl(217 80% 65%) !important; }
+.dark .text-blue-500    { color: hsl(217 80% 65%) !important; }
+.dark .text-rose-600    { color: hsl(0 75% 60%) !important; }
+.dark .text-rose-500    { color: hsl(0 75% 60%) !important; }
+.dark .text-purple-600  { color: hsl(270 70% 65%) !important; }
+
+/* ── Semantic borders ─────────────────────────────────────────── */
+.dark .border-emerald-100  { border-color: hsl(152 30% 20%) !important; }
+.dark .border-emerald-200  { border-color: hsl(152 30% 24%) !important; }
+.dark .border-emerald-200\/50 { border-color: hsl(152 35% 25% / 0.6) !important; }
+.dark .border-emerald-900\/50 { border-color: hsl(152 35% 18% / 0.6) !important; }
+.dark .border-amber-100    { border-color: hsl(38 30% 20%) !important; }
+.dark .border-amber-200\/50  { border-color: hsl(38 35% 25% / 0.6) !important; }
+.dark .border-blue-200     { border-color: hsl(217 35% 28%) !important; }
+.dark .border-rose-200     { border-color: hsl(0 35% 26%) !important; }
+
+/* ── Hover states ─────────────────────────────────────────────── */
+.dark .hover\:bg-zinc-50:hover {
+  background-color: hsl(220 16% 17%) !important;
+}
+.dark .hover\:bg-zinc-100:hover {
+  background-color: hsl(220 16% 20%) !important;
+}
+.dark .hover\:border-zinc-300:hover {
+  border-color: hsl(220 16% 28%) !important;
+}
+.dark .hover\:border-zinc-700:hover {
+  border-color: hsl(220 16% 30%) !important;
+}
+
+/* ── Recharts charts ──────────────────────────────────────────── */
+.dark .recharts-cartesian-grid line {
+  stroke: hsl(220 16% 20%) !important;
+}
+
+/* ── Misc utility shadows ─────────────────────────────────────── */
+.shadow-xs   { box-shadow: var(--shadow-xs); }
+.shadow-card { box-shadow: var(--shadow-sm); }
+.shadow-pop  { box-shadow: var(--shadow-md); }
+.shadow-float{ box-shadow: var(--shadow-lg); }
+
+/* ── Animations ───────────────────────────────────────────────── */
+@keyframes slideUpFade {
+  0%   { transform: translateY(100px) rotate(5deg); opacity: 0; }
+  100% { transform: translateY(0) rotate(0deg); opacity: 1; }
+}
+.animate-slide-up-fade {
+  animation: slideUpFade 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes float {
+  0%   { transform: translateY(0px); }
+  50%  { transform: translateY(-15px); }
+  100% { transform: translateY(0px); }
+}
+.animate-float { animation: float 5s ease-in-out infinite; }
+
+@keyframes blob {
+  0%   { transform: translate(0px, 0px) scale(1); }
+  33%  { transform: translate(30px, -50px) scale(1.1); }
+  66%  { transform: translate(-20px, 20px) scale(0.9); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+.animate-blob { animation: blob 7s infinite; }
+.animation-delay-2000 { animation-delay: 2s; }
+.animation-delay-4000 { animation-delay: 4s; }
+
 #root {
   position: relative;
   z-index: 1;
-}
-
-@layer utilities {
-  .shadow-xs { box-shadow: var(--shadow-xs); }
-  .shadow-card { box-shadow: var(--shadow-sm); }
-  .shadow-pop { box-shadow: var(--shadow-md); }
-  .shadow-float { box-shadow: var(--shadow-lg); }
-
-  @keyframes slideUpFade {
-    0% { transform: translateY(100px) rotate(5deg); opacity: 0; }
-    100% { transform: translateY(0) rotate(0deg); opacity: 1; }
-  }
-  .animate-slide-up-fade {
-    animation: slideUpFade 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  }
-
-  @keyframes float {
-    0% { transform: translateY(0px); }
-    50% { transform: translateY(-15px); }
-    100% { transform: translateY(0px); }
-  }
-  .animate-float {
-    animation: float 5s ease-in-out infinite;
-  }
-
-  @keyframes blob {
-    0% { transform: translate(0px, 0px) scale(1); }
-    33% { transform: translate(30px, -50px) scale(1.1); }
-    66% { transform: translate(-20px, 20px) scale(0.9); }
-    100% { transform: translate(0px, 0px) scale(1); }
-  }
-  .animate-blob {
-    animation: blob 7s infinite;
-  }
-  .animation-delay-2000 { animation-delay: 2s; }
-  .animation-delay-4000 { animation-delay: 4s; }
-}
-
-@keyframes blob {
-  0% { transform: translate(0px, 0px) scale(1); }
-  33% { transform: translate(30px, -50px) scale(1.1); }
-  66% { transform: translate(-20px, 20px) scale(0.9); }
-  100% { transform: translate(0px, 0px) scale(1); }
-}
-
-.animate-blob {
-  animation: blob 7s infinite;
-}
-
-.animation-delay-2000 {
-  animation-delay: 2s;
-}
-
-.animation-delay-4000 {
-  animation-delay: 4s;
 }

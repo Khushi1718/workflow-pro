@@ -125,6 +125,15 @@ async function seedDatabase() {
     ];
 
     await WorkLog.insertMany(sampleLogs);
+    
+    // Update user totalLogs counts based on seeded logs
+    const userLogCounts = await WorkLog.aggregate([
+      { $group: { _id: "$userId", count: { $sum: 1 } } }
+    ]);
+    
+    for (const { _id, count } of userLogCounts) {
+      await User.findByIdAndUpdate(_id, { totalLogs: count });
+    }
 
     console.log("Database seeded successfully.");
     console.log("Admin: admin@google.com / password123");

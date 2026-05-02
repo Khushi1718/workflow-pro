@@ -43,6 +43,11 @@ const assignmentSchema = new Schema<IAssignment>(
   { timestamps: true }
 );
 
+// High-speed indexes for assignment tracking
+assignmentSchema.index({ status: 1 });
+assignmentSchema.index({ projectId: 1 });
+assignmentSchema.index({ createdAt: -1 });
+
 if (mongoose.models.Assignment) {
   delete (mongoose.models as any).Assignment;
 }

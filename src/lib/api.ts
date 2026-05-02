@@ -200,10 +200,13 @@ export const workLogs = {
 
 // ===== ADMIN API =====
 export const admin = {
-  getAllUsers: async (limit = 10, skip = 0) => {
+  getAllUsers: async (limit = 10, skip = 0, q?: string, team?: string, role?: string) => {
     const params = new URLSearchParams();
     params.append("limit", limit.toString());
     params.append("skip", skip.toString());
+    if (q) params.append("q", q);
+    if (team && team !== "all") params.append("team", team);
+    if (role && role !== "all") params.append("role", role);
     return apiRequest(`/admin/users?${params.toString()}`);
   },
 
@@ -368,7 +371,7 @@ export const tasks = {
     });
   },
 
-  getAll: async (type: "assigned_to_me" | "assigned_by_me" | "all" = "assigned_to_me", status?: string, q?: string, date?: string, department?: string, projectId?: string) => {
+  getAll: async (type: "assigned_to_me" | "assigned_by_me" | "all" = "assigned_to_me", status?: string, q?: string, date?: string, department?: string, projectId?: string, assignedTo?: string) => {
     const params = new URLSearchParams();
     params.append("type", type);
     if (status) params.append("status", status);
@@ -376,6 +379,7 @@ export const tasks = {
     if (date) params.append("date", date);
     if (department) params.append("department", department);
     if (projectId) params.append("projectId", projectId);
+    if (assignedTo) params.append("assignedTo", assignedTo);
     return apiRequest(`/tasks?${params.toString()}`);
   },
 

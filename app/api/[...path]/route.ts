@@ -435,7 +435,10 @@ export async function POST(request: NextRequest, context: any) {
         resourceType: "worklog",
         resourceId: workLog._id.toString(),
       });
-
+  
+      // Increment totalLogs count for the user (Enterprise Scale Optimization)
+      await User.findByIdAndUpdate(auth.user.userId, { $inc: { totalLogs: 1 } });
+  
       return ok(
         "Work log created successfully",
         workLog,
@@ -689,31 +692,27 @@ export async function GET(request: NextRequest, context: Context) {
     const filter: Record<string, unknown> = {};
     const isActive = query.get("isActive");
     const role = query.get("role");
+    const team = query.get("team");
+    const q = query.get("q");
 
     if (isActive !== null) filter.isActive = isActive === "true";
-    if (role) filter.role = role;
+    if (role && role !== "all") filter.role = role;
+    if (team && team !== "all") filter.team = team;
+    if (q) {
+      filter.$or = [
+        { name: { $regex: q, $options: "i" } },
+        { email: { $regex: q, $options: "i" } }
+      ];
+    }
 
-    const users = await User.find(filter).select("-password").sort({ joinedAt: -1 }).limit(limitNum).skip(skipNum).lean();
-    
-    // Optimizing log counts - fetch only what's needed
-    const userIds = users.map(u => u._id);
-    const logCounts = await WorkLog.aggregate([
-      { $match: { userId: { $in: userIds } } },
-      { $group: { _id: "$userId", count: { $sum: 1 } } }
-    ]);
-
-    const countsMap = logCounts.reduce((acc: any, curr: any) => {
-      acc[curr._id.toString()] = curr.count;
-      return acc;
-    }, {});
-
-    const usersWithCounts = users.map(u => ({
-      ...u,
-      totalLogs: countsMap[u._id.toString()] || 0
-    }));
+    const users = await User.find(filter)
+      .select("-password")
+      .sort({ joinedAt: -1 })
+      .limit(limitNum)
+      .skip(skipNum)
+      .lean();
 
     const total = await User.countDocuments(filter);
-
 
     logActivity(request, {
       userId: auth.user.userId,
@@ -721,7 +720,7 @@ export async function GET(request: NextRequest, context: Context) {
       resourceType: "user",
     });
 
-    return ok("Users retrieved successfully", usersWithCounts, 200, {
+    return ok("Users retrieved successfully", users, 200, {
       total,
       limit: limitNum,
       skip: skipNum,
@@ -1060,9 +1059,11 @@ export async function GET(request: NextRequest, context: Context) {
     const date = query.get("date");
     const department = query.get("department");
     const projectId = query.get("projectId");
+    const assignedToId = query.get("assignedTo");
     
     const filter: any = {};
     if (projectId) filter.projectId = new Types.ObjectId(projectId);
+    if (assignedToId) filter.assignedTo = new Types.ObjectId(assignedToId);
 
     if (type === "assigned_to_me") {
       filter.assignedTo = new Types.ObjectId(auth.user.userId);
@@ -1236,6 +1237,12 @@ export async function GET(request: NextRequest, context: Context) {
     const auth = requireMasterAdmin(request);
     if (auth.response) return auth.response;
 
+    // HIGH-PERFORMANCE CACHE: Return cached stats if they exist and are fresh (< 5 mins)
+    const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+    if (global.masterStatsCache && (Date.now() - global.masterStatsCache.timestamp < CACHE_TTL)) {
+      return ok("Master stats retrieved (cached)", global.masterStatsCache.data);
+    }
+
     const totalTasks = await Task.countDocuments();
     const pendingTasks = await Task.countDocuments({ status: "pending" });
     const inProgressTasks = await Task.countDocuments({ status: "in_progress" });
@@ -1269,7 +1276,7 @@ export async function GET(request: NextRequest, context: Context) {
       }
     ]);
 
-    return ok("Master stats retrieved", {
+    const stats = {
       tasks: {
         total: totalTasks,
         pending: pendingTasks,
@@ -1281,7 +1288,15 @@ export async function GET(request: NextRequest, context: Context) {
         active: activeUsers
       },
       performance
-    });
+    };
+
+    // Update Cache
+    global.masterStatsCache = {
+      data: stats,
+      timestamp: Date.now()
+    };
+
+    return ok("Master stats retrieved", stats);
   }
 
     return fail(404, "Route not found");
