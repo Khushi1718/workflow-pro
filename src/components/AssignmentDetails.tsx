@@ -29,7 +29,9 @@ import {
   SendHorizontal,
   Save,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Download,
+  Eye
 } from "lucide-react";
 import { tasks, apiRequest, getErrorMessage, files as fileApi } from "@/lib/api";
 
@@ -184,6 +186,24 @@ export function AssignmentDetails({
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const getDownloadUrl = (url: string) => {
+    if (!url) return "";
+    if (url.includes("/raw/")) return url; // Raw assets don't support fl_attachment
+    if (url.includes("cloudinary.com") && !url.includes("fl_attachment")) {
+      return url.replace("/upload/", "/upload/fl_attachment/");
+    }
+    return url;
+  };
+
+  const getViewUrl = (url: string) => {
+    if (!url) return "";
+    if (url.includes("/raw/")) return url; // Raw assets don't support fl_inline
+    if (url.includes("cloudinary.com") && !url.includes("fl_inline")) {
+      return url.replace("/upload/", "/upload/fl_inline/");
+    }
+    return url;
   };
 
   if (!assignment) return null;
@@ -394,9 +414,31 @@ export function AssignmentDetails({
                                   </a>
                                 )}
                                 {task.evidenceFiles?.map((file: any, i: number) => (
-                                  <a key={i} href={file.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[10px] bg-white dark:bg-zinc-900 px-3 py-2 rounded-xl border border-zinc-200 font-bold text-zinc-600 shadow-sm">
-                                    <FileText className="h-3 w-3" /> {file.name}
-                                  </a>
+                                  <div key={i} className="flex items-center gap-2 group/file w-full">
+                                    <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm min-w-0">
+                                      <FileText className="h-3.5 w-3.5 text-zinc-400" />
+                                      <span className="text-[10px] font-bold text-zinc-600 dark:text-zinc-400 truncate flex-1">{file.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <a 
+                                        href={getViewUrl(file.url)} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer" 
+                                        className="p-2 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:text-primary hover:border-primary/30 transition-all shadow-sm"
+                                        title="View File"
+                                      >
+                                        <Eye className="h-3.5 w-3.5" />
+                                      </a>
+                                      <a 
+                                        href={getDownloadUrl(file.url)} 
+                                        download={file.name}
+                                        className="p-2 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:text-primary hover:border-primary/30 transition-all shadow-sm"
+                                        title="Download File"
+                                      >
+                                        <Download className="h-3.5 w-3.5" />
+                                      </a>
+                                    </div>
+                                  </div>
                                 ))}
                              </div>
                           )}

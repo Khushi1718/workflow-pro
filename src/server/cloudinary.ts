@@ -57,6 +57,7 @@ const getPublicId = (fileName: string) => {
 export const uploadToCloudinary = async (fileBuffer: Buffer, fileName: string, mimeType: string) => {
   const client = getCloudinary();
   const isImage = mimeType.startsWith("image/");
+  const isPdf = mimeType === "application/pdf" || fileName.toLowerCase().endsWith(".pdf");
 
   return new Promise((resolve, reject) => {
     let isSettled = false;
@@ -64,12 +65,14 @@ export const uploadToCloudinary = async (fileBuffer: Buffer, fileName: string, m
     const uploadStream = client.uploader.upload_stream(
       {
         folder: 'workflow-pro-uploads',
-        resource_type: isImage ? 'image' : 'auto',
+        resource_type: (isImage || isPdf) ? 'image' : 'auto',
+        format: isPdf ? 'pdf' : undefined,
         public_id: getPublicId(fileName),
         use_filename: false,
         unique_filename: false,
         overwrite: false,
         invalidate: false,
+        access_mode: 'public',
       },
       (error, result) => {
         if (error) {

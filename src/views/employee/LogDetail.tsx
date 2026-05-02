@@ -13,7 +13,7 @@ import {
   Link as LinkIcon, Image as ImageIcon, 
   ExternalLink, Paperclip, CheckCircle2, Circle, Clock, ListTodo,
   CheckSquare, Square, History, ShieldCheck, MessageSquare,
-  ChevronRight, ArrowRight
+  ChevronRight, ArrowRight, Download, Eye
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { WorkLog, Task } from "@/lib/mock-data";
@@ -106,6 +106,24 @@ export default function LogDetail() {
       case "link": return <LinkIcon className="h-5 w-5 text-foreground" />;
       default: return <Paperclip className="h-5 w-5 text-muted-foreground" />;
     }
+  };
+
+  const getDownloadUrl = (url: string) => {
+    if (!url) return "";
+    if (url.includes("/raw/")) return url; // Raw assets don't support fl_attachment
+    if (url.includes("cloudinary.com") && !url.includes("fl_attachment")) {
+      return url.replace("/upload/", "/upload/fl_attachment/");
+    }
+    return url;
+  };
+
+  const getViewUrl = (url: string) => {
+    if (!url) return "";
+    if (url.includes("/raw/")) return url; // Raw assets don't support fl_inline
+    if (url.includes("cloudinary.com") && !url.includes("fl_inline")) {
+      return url.replace("/upload/", "/upload/fl_inline/");
+    }
+    return url;
   };
 
   return (
@@ -234,24 +252,35 @@ export default function LogDetail() {
             {log.attachments && log.attachments.length > 0 ? (
               <ul className="grid gap-4 sm:grid-cols-2">
                 {log.attachments.map((att) => (
-                  <li key={att.id}>
-                    <a
-                      href={att.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="group flex items-center gap-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 p-4 transition-all hover:bg-white hover:shadow-md"
-                    >
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white dark:bg-zinc-800 shadow-sm border border-zinc-100">
-                        {getAttachmentIcon(att.type)}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-bold text-zinc-700 group-hover:text-primary transition-colors">
-                          {att.name}
-                        </p>
-                        <p className="text-[10px] font-bold text-zinc-400 uppercase mt-0.5">{att.type}</p>
-                      </div>
-                      <ExternalLink className="h-4 w-4 text-zinc-300 opacity-0 transition-opacity group-hover:opacity-100" />
-                    </a>
+                  <li key={att.id} className="group flex items-center gap-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 p-4 transition-all hover:bg-white hover:shadow-md">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white dark:bg-zinc-800 shadow-sm border border-zinc-100">
+                      {getAttachmentIcon(att.type)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-zinc-700 group-hover:text-primary transition-colors">
+                        {att.name}
+                      </p>
+                      <p className="text-[10px] font-bold text-zinc-400 uppercase mt-0.5">{att.type}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <a
+                        href={getViewUrl(att.url)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="p-2.5 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 text-zinc-400 hover:text-primary hover:border-primary/30 transition-all shadow-sm"
+                        title="View File"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </a>
+                      <a
+                        href={getDownloadUrl(att.url)}
+                        download={att.name}
+                        className="p-2.5 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 text-zinc-400 hover:text-primary hover:border-primary/30 transition-all shadow-sm"
+                        title="Download File"
+                      >
+                        <Download className="h-4 w-4" />
+                      </a>
+                    </div>
                   </li>
                 ))}
               </ul>
