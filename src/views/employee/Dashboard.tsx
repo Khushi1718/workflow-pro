@@ -119,17 +119,23 @@ export default function EmployeeDashboard() {
           tDone += bundleDone;
           tPending += (bundleTotal - bundleDone);
 
+          const isCreatedToday = new Date(a.createdAt).toDateString() === now.toDateString();
+
           if (a.tasks && Array.isArray(a.tasks)) {
             a.tasks.forEach((t: any) => {
-              const taskCreatedAt = new Date(a.createdAt);
               const taskDoneAt = t.completedAt ? new Date(t.completedAt) : null;
+              const isDoneToday = taskDoneAt && taskDoneAt.toDateString() === now.toDateString();
 
-              if (taskCreatedAt >= startOfToday) todayT++;
-              if (t.status === "completed" && taskDoneAt && taskDoneAt >= startOfToday) todayD++;
-              if (t.status !== "completed" && taskCreatedAt >= startOfToday) todayP++;
+              if (isCreatedToday) todayT++;
+              if (t.status === "completed" && isDoneToday) todayD++;
+              if (t.status !== "completed" && isCreatedToday) todayP++;
             });
+          } else if (isCreatedToday) {
+            todayT += bundleTotal;
+            todayP += (bundleTotal - bundleDone);
           }
         });
+
 
         setStats({
           total: tTotal,

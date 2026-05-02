@@ -2,13 +2,6 @@ import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import multer from 'multer';
 
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
 // Helper to check if Cloudinary is configured
 export const isCloudinaryConfigured = () => {
   return !!(
@@ -18,35 +11,17 @@ export const isCloudinaryConfigured = () => {
   );
 };
 
-// Storage configuration
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: async (req, file) => {
-    // Determine folder based on file type or context if needed
-    const folder = 'workflow-pro-uploads';
-    
-    // Get file extension
-    const extension = file.originalname.split('.').pop()?.toLowerCase();
-    
-    // Support multiple formats including docs, pdfs, etc.
-    // Cloudinary 'auto' resource_type handles this
-    return {
-      folder: folder,
-      resource_type: 'auto',
-      public_id: `${Date.now()}-${file.originalname.split('.')[0]}`,
-      format: extension === 'pdf' ? 'pdf' : undefined, // Explicitly set pdf format if needed
-    };
-  },
-});
+// Storage configuration (Lazy initialized or re-configured if needed)
+export const getCloudinary = () => {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+  return cloudinary;
+};
 
-export const upload = multer({ 
-  storage: storage,
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
-  }
-});
-
-// Simple upload function for use without multer (e.g. in Next.js API routes)
+// Simple upload function for use in Next.js API routes
 export const uploadToCloudinary = async (fileBuffer: Buffer, fileName: string, mimeType: string) => {
   if (!isCloudinaryConfigured()) {
     console.warn('Cloudinary environment variables are missing. Falling back to mock upload.');
@@ -57,8 +32,10 @@ export const uploadToCloudinary = async (fileBuffer: Buffer, fileName: string, m
     };
   }
 
+  const client = getCloudinary();
+
   return new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
+    const uploadStream = client.uploader.upload_stream(
       {
         folder: 'workflow-pro-uploads',
         resource_type: 'auto',

@@ -126,7 +126,6 @@ export default function AdminDashboard() {
           let todayTotal = 0, todayCompleted = 0, todayPending = 0;
 
           assignments.forEach(a => {
-            // Priority: Sum of tasks or pre-calculated field
             const aTotal = a.totalTasks || (a.tasks?.length || 0);
             const aDone = a.completedTasks || (a.tasks?.filter((t: any) => t.status === 'completed').length || 0);
             
@@ -134,21 +133,23 @@ export default function AdminDashboard() {
             completed += aDone;
             pending += (aTotal - aDone);
             
+            const isCreatedToday = new Date(a.createdAt).toDateString() === now.toDateString();
+
             if (a.tasks && Array.isArray(a.tasks)) {
               a.tasks.forEach((t: any) => {
                 const taskDoneAt = t.completedAt ? new Date(t.completedAt) : null;
-                const taskCreatedAt = new Date(a.createdAt);
+                const isDoneToday = taskDoneAt && taskDoneAt.toDateString() === now.toDateString();
 
-                if (taskCreatedAt >= startOfToday) todayTotal++;
-                if (t.status === "completed" && taskDoneAt && taskDoneAt >= startOfToday) todayCompleted++;
-                if (t.status !== "completed" && taskCreatedAt >= startOfToday) todayPending++;
+                if (isCreatedToday) todayTotal++;
+                if (t.status === "completed" && isDoneToday) todayCompleted++;
+                if (t.status !== "completed" && isCreatedToday) todayPending++;
               });
-            } else if (new Date(a.createdAt) >= startOfToday) {
-               // Fallback if tasks array is missing but bundle was created today
+            } else if (isCreatedToday) {
                todayTotal += aTotal;
                todayPending += (aTotal - aDone);
             }
           });
+
           return { total, completed, pending, todayTotal, todayCompleted, todayPending };
         };
 

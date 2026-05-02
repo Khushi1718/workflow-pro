@@ -559,8 +559,9 @@ export async function POST(request: NextRequest, context: any) {
       return ok("Files uploaded successfully", uploadResults.length === 1 ? uploadResults[0] : uploadResults);
     } catch (error: any) {
       console.error("Global upload error:", error);
-      return fail(500, "Upload process failed", error.message);
+      return fail(500, "Upload process failed", error.message || String(error));
     }
+
   }
 
 

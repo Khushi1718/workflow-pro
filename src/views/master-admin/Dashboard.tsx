@@ -139,8 +139,9 @@ export default function MasterAdminDashboard() {
         const completedTasksCount = flattenedTasks.filter((t: any) => t.status === "completed").length;
         const pendingTasksCount = flattenedTasks.filter((t: any) => t.status === "pending").length;
 
-        const todayTasks = flattenedTasks.filter((t: any) => new Date(t.createdAt) >= startOfToday);
-        const todayCompleted = todayTasks.filter((t: any) => t.status === "completed").length;
+        const todayTasks = flattenedTasks.filter((t: any) => new Date(t.createdAt).toDateString() === now.toDateString());
+        const todayCompleted = todayTasks.filter((t: any) => t.status === "completed" && t.completedAt && new Date(t.completedAt).toDateString() === now.toDateString()).length;
+
         const todayOverdue = flattenedTasks.filter((t: any) => t.status !== "completed" && new Date(t.deadline) < now).length;
 
         setStats({

@@ -16,12 +16,15 @@ const assignmentSchema = new Schema<IAssignment>(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
+      index: true,
     },
     assignedTo: {
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
+      index: true,
     },
+
     projectId: {
       type: Schema.Types.ObjectId,
       ref: "Project",
