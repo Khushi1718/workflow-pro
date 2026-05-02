@@ -1,5 +1,6 @@
 // API Client for WorkFlow Pro Next backend
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "/api";
+const MAX_UPLOAD_SIZE_BYTES = 4 * 1024 * 1024;
 
 interface ApiResponse<T = any> {
   success: boolean;
@@ -397,12 +398,15 @@ export const masterAdmin = {
 // ===== FILE UPLOAD API =====
 export const files = {
   upload: async (file: File | File[]) => {
-    const formData = new FormData();
-    if (Array.isArray(file)) {
-      file.forEach((f) => formData.append("files", f));
-    } else {
-      formData.append("files", file);
+    const uploadFiles = Array.isArray(file) ? file : [file];
+    const oversizedFile = uploadFiles.find((f) => f.size > MAX_UPLOAD_SIZE_BYTES);
+
+    if (oversizedFile) {
+      throw new Error(`${oversizedFile.name} is too large. Maximum upload size is 4MB.`);
     }
+
+    const formData = new FormData();
+    uploadFiles.forEach((f) => formData.append("files", f));
 
     return apiRequest("/upload", {
       method: "POST",

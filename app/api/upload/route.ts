@@ -1,27 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
-import { connectDB } from "@/server/db";
 import { uploadToCloudinary, isCloudinaryConfigured } from "@/server/cloudinary";
 import { verifyToken } from "@/server/jwt";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
+const MAX_FILE_SIZE_BYTES = 4 * 1024 * 1024;
+
 // Helper for standardized responses
-const ok = (message: string, data?: any, status = 200) => 
+const ok = (message: string, data?: unknown, status = 200) =>
   NextResponse.json({ success: true, message, data }, { status });
 
-const fail = (status: number, message: string, error?: any) => 
+const fail = (status: number, message: string, error?: unknown) =>
   NextResponse.json({ success: false, message, error: error || message }, { status });
 
 export async function POST(request: NextRequest) {
   try {
-    await connectDB();
-
     // 1. Auth Check
     const authHeader = request.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return fail(401, "Authorization header missing");
     }
-    const user = verifyToken(authHeader.slice(7));
-    if (!user) {
+    try {
+      verifyToken(authHeader.slice(7));
+    } catch {
       return fail(401, "Invalid or expired token");
+    }
+
+    if (!isCloudinaryConfigured()) {
+      return fail(
+        503,
+        "File uploads are not configured on the server.",
+        "Missing CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, or CLOUDINARY_API_SECRET in the deployment environment."
+      );
     }
 
     // 2. Parse Form Data
@@ -47,14 +59,19 @@ export async function POST(request: NextRequest) {
       }
 
       const file = fileItem as File;
+
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        return fail(
+          413,
+          `${file.name} is too large.`,
+          `Maximum upload size is ${MAX_FILE_SIZE_BYTES / 1024 / 1024}MB per file.`
+        );
+      }
       
       try {
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
-        
-        // Sanitize filename for Cloudinary Public ID (remove spaces and special chars)
-        const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_').split('.')[0];
-        
+
         const result: any = await uploadToCloudinary(buffer, file.name, file.type);
         
         uploadResults.push({
@@ -65,12 +82,16 @@ export async function POST(request: NextRequest) {
         });
       } catch (fileError: any) {
         console.error(`Error uploading ${file.name}:`, fileError);
-        // We continue with other files but log the error
+        return fail(
+          502,
+          `Failed to upload ${file.name}.`,
+          fileError?.message || "Cloudinary upload failed."
+        );
       }
     }
 
     if (uploadResults.length === 0) {
-      return fail(500, "All file uploads failed. Check server logs or Cloudinary credentials.");
+      return fail(400, "No valid files were provided in the 'files' field.");
     }
 
     return ok("Upload successful", uploadResults.length === 1 ? uploadResults[0] : uploadResults);
@@ -80,6 +101,3 @@ export async function POST(request: NextRequest) {
     return fail(500, "Internal Server Error during upload", error.message);
   }
 }
-
-// Ensure Vercel doesn't cache this route
-export const dynamic = 'force-dynamic';
