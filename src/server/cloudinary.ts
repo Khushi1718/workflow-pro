@@ -1,9 +1,14 @@
 import { v2 as cloudinary } from 'cloudinary';
+import { Readable } from 'stream';
+
+const cleanEnvValue = (value?: string) => {
+  return value?.trim().replace(/^['"]|['"]$/g, "");
+};
 
 const readCloudinaryEnv = () => ({
-  cloudName: process.env.CLOUDINARY_CLOUD_NAME?.trim(),
-  apiKey: process.env.CLOUDINARY_API_KEY?.trim(),
-  apiSecret: process.env.CLOUDINARY_API_SECRET?.trim(),
+  cloudName: cleanEnvValue(process.env.CLOUDINARY_CLOUD_NAME),
+  apiKey: cleanEnvValue(process.env.CLOUDINARY_API_KEY),
+  apiSecret: cleanEnvValue(process.env.CLOUDINARY_API_SECRET),
 });
 
 // Helper to check if Cloudinary is configured
@@ -53,6 +58,8 @@ export const uploadToCloudinary = async (fileBuffer: Buffer, fileName: string, m
   const client = getCloudinary();
 
   return new Promise((resolve, reject) => {
+    let isSettled = false;
+
     const uploadStream = client.uploader.upload_stream(
       {
         folder: 'workflow-pro-uploads',
@@ -64,26 +71,59 @@ export const uploadToCloudinary = async (fileBuffer: Buffer, fileName: string, m
       (error, result) => {
         if (error) {
           console.error('Cloudinary upload error:', error);
-          reject(error);
+          if (!isSettled) {
+            isSettled = true;
+            reject(error);
+          }
           return;
         }
-
+ 
         if (!result?.secure_url) {
-          reject(new Error("Cloudinary upload did not return a secure URL."));
+          if (!isSettled) {
+            isSettled = true;
+            reject(new Error("Cloudinary upload did not return a secure URL."));
+          }
           return;
         }
-
-        resolve({
-          url: result.secure_url,
-          name: fileName,
-          type: mimeType,
-          public_id: result.public_id
-        });
+ 
+        if (!isSettled) {
+          isSettled = true;
+          resolve({
+            url: result.secure_url,
+            name: fileName,
+            type: mimeType,
+            public_id: result.public_id
+          });
+        }
       }
     );
 
-    uploadStream.on("error", reject);
-    uploadStream.end(fileBuffer);
+    uploadStream.on("error", (error) => {
+      console.error('Cloudinary Stream error:', error);
+      if (!isSettled) {
+        isSettled = true;
+        reject(error);
+      }
+    });
+
+    // Convert buffer to readable stream and pipe to Cloudinary
+    try {
+      const stream = Readable.from(fileBuffer);
+      stream.on("error", (error) => {
+        console.error('Readable stream error:', error);
+        if (!isSettled) {
+          isSettled = true;
+          reject(error);
+        }
+      });
+      stream.pipe(uploadStream);
+    } catch (streamError) {
+      console.error('Error creating or piping stream:', streamError);
+      if (!isSettled) {
+        isSettled = true;
+        reject(streamError);
+      }
+    }
   });
 };
 

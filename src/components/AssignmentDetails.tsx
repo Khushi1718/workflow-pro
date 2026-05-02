@@ -31,7 +31,7 @@ import {
   ChevronDown,
   ChevronUp
 } from "lucide-react";
-import { tasks, apiRequest, files as fileApi } from "@/lib/api";
+import { tasks, apiRequest, getErrorMessage, files as fileApi } from "@/lib/api";
 
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -128,7 +128,7 @@ export function AssignmentDetails({
       });
       toast.success("Files attached to draft");
     } catch (error) {
-      toast.error("File upload failed");
+      toast.error(getErrorMessage(error, "File upload failed"));
     } finally {
       setIsUploading(null);
     }

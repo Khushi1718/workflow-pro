@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "@/lib/router";
 import { AppShell } from "@/components/AppShell";
-import { tasks, auth as authApi, admin, apiRequest, projects, files as fileApi } from "@/lib/api";
+import { tasks, auth as authApi, admin, apiRequest, projects, getErrorMessage, files as fileApi } from "@/lib/api";
 
 import { 
   ClipboardList, 
@@ -344,7 +344,7 @@ export default function TaskBoard({
       setEvidenceData({ ...evidenceData, evidenceFiles: newFiles });
       toast.success("Files uploaded successfully");
     } catch (error) {
-      toast.error("File upload failed");
+      toast.error(getErrorMessage(error, "File upload failed"));
     } finally {
       setIsUploading(false);
     }

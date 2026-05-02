@@ -83,9 +83,9 @@ export async function POST(request: NextRequest) {
       } catch (fileError: any) {
         console.error(`Error uploading ${file.name}:`, fileError);
         return fail(
-          502,
+          500,
           `Failed to upload ${file.name}.`,
-          fileError?.message || "Cloudinary upload failed."
+          fileError?.message || "Cloudinary upload failed. Check your credentials and network connection."
         );
       }
     }

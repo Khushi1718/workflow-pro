@@ -37,7 +37,7 @@ import {
 } from "lucide-react";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { toast } from "sonner";
-import { auth, workLogs, files as fileApi } from "@/lib/api";
+import { auth, getErrorMessage, workLogs, files as fileApi } from "@/lib/api";
 
 import { Task, LogStatus, LogState, WorkLogAttachment, SeoData } from "@/lib/mock-data";
 
@@ -263,7 +263,7 @@ export default function AddLog() {
       }
     } catch (error) {
       console.error("Upload error:", error);
-      toast.error("Failed to upload file");
+      toast.error(getErrorMessage(error, "Failed to upload file"));
     } finally {
       setIsLoading(false);
     }

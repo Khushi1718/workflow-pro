@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { messaging, files as fileApi } from '@/lib/api';
+import { getErrorMessage, messaging, files as fileApi } from '@/lib/api';
 
 import { ChatMessage } from './ChatMessage';
 import { MentionInput } from './MentionInput';
@@ -133,7 +133,7 @@ export function ChatWindow({
       toast.success("Files uploaded successfully");
     } catch (error) {
       console.error("Upload error:", error);
-      toast.error("Failed to upload files");
+      toast.error(getErrorMessage(error, "Failed to upload files"));
     } finally {
       setIsSending(false);
       if (fileInputRef.current) fileInputRef.current.value = '';

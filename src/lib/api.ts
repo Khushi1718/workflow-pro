@@ -15,6 +15,10 @@ interface ApiResponse<T = any> {
   };
 }
 
+export const getErrorMessage = (error: unknown, fallback = "Something went wrong") => {
+  return error instanceof Error && error.message ? error.message : fallback;
+};
+
 // Get auth token from localStorage
 export const getAuthToken = (): string | null => {
   return localStorage.getItem("authToken");
@@ -53,10 +57,22 @@ export const apiRequest = async <T = any,>(
     headers,
   });
 
-  const data = await response.json();
+  let data: any = {};
+  const contentType = response.headers.get("content-type");
+  
+  if (contentType && contentType.includes("application/json")) {
+    data = await response.json();
+  } else {
+    // Handle non-JSON response (like a 502 HTML page)
+    const text = await response.text();
+    if (!response.ok) {
+      throw new Error(`Server error (${response.status}): ${text.slice(0, 100)}${text.length > 100 ? '...' : ''}`);
+    }
+    data = { success: true, message: text };
+  }
 
   if (!response.ok) {
-    throw new Error(data.message || data.error || "API request failed");
+    throw new Error(data.message || data.error || `API request failed with status ${response.status}`);
   }
 
   return data;
