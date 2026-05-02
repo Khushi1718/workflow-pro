@@ -1,5 +1,4 @@
 import { v2 as cloudinary } from 'cloudinary';
-import { Readable } from 'stream';
 
 const cleanEnvValue = (value?: string) => {
   return value?.trim().replace(/^['"]|['"]$/g, "");
@@ -53,85 +52,38 @@ const getPublicId = (fileName: string) => {
   return `${Date.now()}-${safeName || "upload"}`;
 };
 
-// Simple upload function for use in Next.js API routes
+/**
+ * Uploads a file buffer to Cloudinary.
+ * Using Base64 instead of Streams for better stability in serverless environments like Vercel.
+ */
 export const uploadToCloudinary = async (fileBuffer: Buffer, fileName: string, mimeType: string) => {
   const client = getCloudinary();
   const isImage = mimeType.startsWith("image/");
   const isPdf = mimeType === "application/pdf" || fileName.toLowerCase().endsWith(".pdf");
 
-  return new Promise((resolve, reject) => {
-    let isSettled = false;
+  try {
+    // Convert buffer to Base64 data URI
+    const base64Data = fileBuffer.toString('base64');
+    const dataUri = `data:${mimeType};base64,${base64Data}`;
 
-    const uploadStream = client.uploader.upload_stream(
-      {
-        folder: 'workflow-pro-uploads',
-        resource_type: (isImage || isPdf) ? 'image' : 'auto',
-        format: isPdf ? 'pdf' : undefined,
-        public_id: getPublicId(fileName),
-        use_filename: false,
-        unique_filename: false,
-        overwrite: false,
-        invalidate: false,
-        access_mode: 'public',
-      },
-      (error, result) => {
-        if (error) {
-          console.error('Cloudinary upload error:', error);
-          if (!isSettled) {
-            isSettled = true;
-            reject(error);
-          }
-          return;
-        }
- 
-        if (!result?.secure_url) {
-          if (!isSettled) {
-            isSettled = true;
-            reject(new Error("Cloudinary upload did not return a secure URL."));
-          }
-          return;
-        }
- 
-        if (!isSettled) {
-          isSettled = true;
-          resolve({
-            url: result.secure_url,
-            name: fileName,
-            type: mimeType,
-            public_id: result.public_id
-          });
-        }
-      }
-    );
-
-    uploadStream.on("error", (error) => {
-      console.error('Cloudinary Stream error:', error);
-      if (!isSettled) {
-        isSettled = true;
-        reject(error);
-      }
+    const result = await client.uploader.upload(dataUri, {
+      folder: 'workflow-pro-uploads',
+      resource_type: (isImage || isPdf) ? 'image' : 'auto',
+      format: isPdf ? 'pdf' : undefined,
+      public_id: getPublicId(fileName),
+      access_mode: 'public',
     });
 
-    // Convert buffer to readable stream and pipe to Cloudinary
-    try {
-      // Use an array wrapper so stream emits a Buffer chunk, not byte-by-byte numbers.
-      const stream = Readable.from([fileBuffer]);
-      stream.on("error", (error) => {
-        console.error('Readable stream error:', error);
-        if (!isSettled) {
-          isSettled = true;
-          reject(error);
-        }
-      });
-      stream.pipe(uploadStream);
-    } catch (streamError) {
-      console.error('Error creating or piping stream:', streamError);
-      if (!isSettled) {
-        isSettled = true;
-        reject(streamError);
-      }
-    }
-  });
+    return {
+      url: result.secure_url,
+      name: fileName,
+      type: mimeType,
+      public_id: result.public_id
+    };
+  } catch (error: any) {
+    console.error('Cloudinary upload error:', error);
+    throw error;
+  }
 };
 
 export default cloudinary;

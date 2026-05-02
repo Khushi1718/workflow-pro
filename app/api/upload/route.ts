@@ -16,16 +16,16 @@ const fail = (status: number, message: string, error?: unknown) =>
   NextResponse.json({ success: false, message, error: error || message }, { status });
 
 const getUploadFailure = (error: any) => {
-  const providerStatus = Number(error?.http_code);
+  const providerStatus = Number(error?.http_code) || 500;
   const rawMessage =
     (typeof error?.message === "string" && error.message) ||
     (typeof error?.error?.message === "string" && error.error.message) ||
     "Cloudinary upload failed.";
 
-  // Treat upstream failures as bad gateway so clients can retry.
-  const status = providerStatus >= 400 && providerStatus < 500 ? 502 : 502;
+  // Use the provider's status if it's a client error (4xx), otherwise default to 502 for upstream issues.
+  const status = providerStatus >= 400 && providerStatus < 500 ? providerStatus : 502;
   const message = rawMessage.includes("invalid JSON response")
-    ? "Upload provider returned an invalid response. Verify Cloudinary credentials and cloud name."
+    ? "Upload provider returned an invalid response. Verify Cloudinary credentials."
     : rawMessage;
 
   return { status, message };
