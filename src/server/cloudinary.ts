@@ -56,6 +56,7 @@ const getPublicId = (fileName: string) => {
 // Simple upload function for use in Next.js API routes
 export const uploadToCloudinary = async (fileBuffer: Buffer, fileName: string, mimeType: string) => {
   const client = getCloudinary();
+  const isImage = mimeType.startsWith("image/");
 
   return new Promise((resolve, reject) => {
     let isSettled = false;
@@ -63,10 +64,12 @@ export const uploadToCloudinary = async (fileBuffer: Buffer, fileName: string, m
     const uploadStream = client.uploader.upload_stream(
       {
         folder: 'workflow-pro-uploads',
-        resource_type: 'auto',
+        resource_type: isImage ? 'image' : 'auto',
         public_id: getPublicId(fileName),
         use_filename: false,
         unique_filename: false,
+        overwrite: false,
+        invalidate: false,
       },
       (error, result) => {
         if (error) {
@@ -108,7 +111,8 @@ export const uploadToCloudinary = async (fileBuffer: Buffer, fileName: string, m
 
     // Convert buffer to readable stream and pipe to Cloudinary
     try {
-      const stream = Readable.from(fileBuffer);
+      // Use an array wrapper so stream emits a Buffer chunk, not byte-by-byte numbers.
+      const stream = Readable.from([fileBuffer]);
       stream.on("error", (error) => {
         console.error('Readable stream error:', error);
         if (!isSettled) {
